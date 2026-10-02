@@ -19,7 +19,7 @@ export const DONNEES = {
       nom: 'Mur conventionnel',
       sousTitre: 'solution courante',
       carbone: null, energie: null, uniteEnergie: 'kWh',
-      tempInterieure: 36, humRelative: 70,
+      tempInterieure: 33, humRelative: 70,     /* valeur du laboratoire, révisée le 02/10/2026 (36 → 33 °C) */
       phraseFenetre: 'La matière vient de loin.'
     },
     terre: {
@@ -186,7 +186,10 @@ export const DONNEES = {
      λ(f) = 0,35 − 0,088·f, et l'épaisseur ci-dessous.
      ================================================================== */
   thermique: {
-    exterieurHiver: 10,          /* °C */
+    /* °C — SCÉNARIO d'hiver avec neige, choisi par l'équipe (02/10/2026) :
+       ce n'est pas une donnée climatique. Tout le reste en découle :
+       températures de surface, déperditions, kWh/jour, textes affichés. */
+    exterieurHiver: -2,
     consignes: [20, 30, 40],     /* °C — 20 est la consigne réaliste */
     consigneDefaut: 20,
     Rsi: 0.13, Rse: 0.04, RsiToit: 0.10,
