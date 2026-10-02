@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>La cuisine des matériaux</title>
+<link rel="icon" href="data:,">
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -71,6 +72,13 @@
               border-radius: 9px !important; background: rgba(14,10,9,.9) !important;
               border: 1px solid rgba(200,118,42,.5) !important; color: #F0E6D4 !important; }
   #camhud { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  /* ---- compteur d'images : index.html?fps — à garder fermé le jour J ---- */
+  #fps { position: fixed; top: calc(6px + env(safe-area-inset-top,0px)); left: 8px; z-index: 5;
+         font: 700 12px/1.35 ui-monospace, Menlo, monospace; color: #9FD08A;
+         background: rgba(10,8,6,.72); border: 1px solid rgba(159,208,138,.35);
+         border-radius: 7px; padding: 5px 8px; pointer-events: none; white-space: pre; }
+  #fps.bas { color: #F2B36A; border-color: rgba(242,179,106,.45); }
+  #fps.rouge { color: #F07A5A; border-color: rgba(240,122,90,.5); }
   #intro { position: fixed; inset: 0; display: grid; place-items: center; padding: 26px;
            background: #0C0908; text-align: center; z-index: 5; }
   #intro h1 { font-family: Georgia, serif; font-size: clamp(2rem,6.5vw,3.2rem); margin: 0 0 12px; }
@@ -101,6 +109,8 @@
 
 <div id="vitrine" hidden><b>DÉMONSTRATION EN BOUCLE</b>
   <span>l’expérience complète se vit au casque — demandez à un animateur</span></div>
+
+<div id="fps" hidden></div>
 
 <canvas id="camhud" hidden></canvas>
 
@@ -188,7 +198,12 @@ scene.background = new THREE.Color(0x0C0908);
 
 const camera = new THREE.PerspectiveCamera(66, innerWidth/innerHeight, 0.04, 60);
 const rig = new THREE.Group(); rig.add(camera); scene.add(rig);
-rig.position.set(0, 0, 0.34);
+/* Au casque, la hauteur du regard est la vraie : un enfant ou un visiteur
+   assis voyait la façade du meuble au lieu du plan de travail. On recale donc
+   le décor pour que les yeux soient à 1,50 m dans la scène, quelle que soit
+   la taille du visiteur. La gâchette latérale (grip) refait le calage. */
+let rigY = 0;
+rig.position.set(0, rigY, 0.34);
 camera.position.set(0, 1.50, 0);          /* debout devant le plan de travail */
 
 /* ===================== LUMIÈRE : jour froid + suspension chaude ===================== */
@@ -203,7 +218,8 @@ jour.shadow.camera.top=3; jour.shadow.camera.bottom=-2;
 jour.shadow.bias=-0.0011; jour.shadow.normalBias=0.018;
 scene.add(jour, jour.target);
 
-const suspension = new THREE.PointLight(0xFFC98A, 2.2, 7, 2);
+const SUSP_I = 2.5;                                  /* la lampe est chaude : le contraste fait la scène */
+const suspension = new THREE.PointLight(0xFFB870, SUSP_I, 7, 2);
 suspension.position.set(0, 1.92, -0.15);
 suspension.castShadow = true;
 suspension.shadow.mapSize.set(512,512);
@@ -215,10 +231,13 @@ scene.add(new THREE.HemisphereLight(0xE7EFF7, 0x6A5034, 0.30));
 /* ===================== MATIÈRES ===================== */
 const mBois   = materiau({ base:[146,104,62], mottle:0.24, grain:0.10, micro:0.03, planches:true,
                            roughBase:0.45, roughVar:0.18, relief:6, scale:11, seed:5, repeat:[2,1], normalScale:0.55 });
-const mFaience= materiau({ base:[226,220,206], carrelage:6, mottle:0.14, grain:0.04, micro:0.02,
-                           roughBase:0.22, roughVar:0.30, relief:22, scale:6, seed:31, repeat:[4,1], normalScale:0.9 });
-const mMur    = materiau({ base:[214,201,180], mottle:0.07, grain:0.04, micro:0.02,
-                           roughBase:0.94, roughVar:0.06, relief:6, scale:7, seed:47, repeat:[2,1.4], normalScale:0.5 });
+/* Faïence : moins de relief fin et une surface moins vernie. Au casque, le
+   relief à haute fréquence accrochait des reflets ponctuels qui scintillaient
+   à chaque mouvement de tête (les petits points roses des photos). */
+const mFaience= materiau({ base:[226,220,206], carrelage:6, mottle:0.12, grain:0.02, micro:0.004,
+                           roughBase:0.48, roughVar:0.14, relief:9, scale:6, seed:31, repeat:[4,1], normalScale:0.35 });
+const mMur    = materiau({ base:[214,201,180], mottle:0.07, grain:0.025, micro:0.006,
+                           roughBase:0.95, roughVar:0.05, relief:5, scale:7, seed:47, repeat:[2,1.4], normalScale:0.3 });
 const mSolTom = materiau({ base:[172,104,72], carrelage:5, mottle:0.22, grain:0.05, micro:0.03,
                            roughBase:0.42, roughVar:0.26, relief:16, scale:6, seed:19, repeat:[3,3], normalScale:0.8 });
 const mMeuble = materiau({ base:[74,86,80], mottle:0.05, grain:0.03, micro:0.02,
@@ -332,7 +351,7 @@ box(3.0,0.05,0.26,mBois,0,PY+1.30,-0.96);
   vitre.position.set(XM-0.055, yc, zc); vitre.rotation.y = -Math.PI/2; scene.add(vitre);
 
   /* la lumière qui entre par là */
-  const jourFenetre = new THREE.DirectionalLight(0xFFF3DF, 0.85);
+  const jourFenetre = new THREE.DirectionalLight(0xD8E6FF, 1.0);   /* le jour qui entre est froid, bleuté */
   jourFenetre.position.set(6.2, 3.0, 0.6);
   jourFenetre.target.position.set(0.2, 1.0, -0.6);
   scene.add(jourFenetre, jourFenetre.target);
@@ -345,7 +364,7 @@ box(3.0,0.05,0.26,mBois,0,PY+1.30,-0.96);
   ab.position.set(0,1.98,-0.15); ab.castShadow=true; scene.add(ab);
   const amp=new THREE.Mesh(new THREE.SphereGeometry(0.05,12,10),
     new THREE.MeshBasicMaterial({color:0xFFE2B0,toneMapped:false}));
-  amp.position.set(0,1.90,-0.15); scene.add(amp);
+  amp.position.set(0,1.90,-0.15); scene.add(amp); scene.userData.ampoule = amp;
 }
 
 /* ===================== LES BOCAUX D'INGRÉDIENTS ===================== */
@@ -563,38 +582,66 @@ const ticketSupport = [];      /* le petit chevalet qui tient la commande */
    Posée sur le plan de travail, adossée à la crédence, comme dans un bistrot.
    Elle dépasse des bocaux : on la lit sans tourner la tête.
    ---------------------------------------------------------------------------- */
+/* Le menu s'écrit à la craie quand le visiteur arrive au plan de travail, et
+   chaque plat se coche quand il est servi : entrée (la terre), plat (le mur),
+   dessert (le confort). Le parcours devient un repas. */
+const ardoiseEtat = { prog: 0, faits: new Set() };
+let peindreArdoise = () => {};
 {
   const c=document.createElement('canvas'); c.width=440; c.height=572;
   const g=c.getContext('2d');
-  g.fillStyle='#22221F'; g.fillRect(0,0,440,572);
-  /* grain de l'ardoise */
+  /* le fond : l'ardoise, son cadre et le titre, toujours là */
+  const fond=document.createElement('canvas'); fond.width=440; fond.height=572;
+  const gf=fond.getContext('2d');
+  gf.fillStyle='#22221F'; gf.fillRect(0,0,440,572);
   let ga=4242; const rn=()=>(ga=(ga*1103515245+12345)&0x7fffffff)/0x7fffffff;
-  for(let i=0;i<2600;i++){ g.fillStyle='rgba(255,255,255,'+(0.012+rn()*0.028)+')';
-    g.fillRect(rn()*440, rn()*572, 1.6, 1.2); }
-  g.strokeStyle='#7A5430'; g.lineWidth=22; g.strokeRect(11,11,418,550);
-  g.strokeStyle='#5C3E22'; g.lineWidth=4; g.strokeRect(22,22,396,528);
-  g.textAlign='center';
-  g.fillStyle='#F2EFE6'; g.font='bold 40px Georgia, serif';
-  g.fillText('MENU DU JOUR', 220, 108);
-  g.strokeStyle='#9C9788'; g.lineWidth=2;
-  g.beginPath(); g.moveTo(84,130); g.lineTo(356,130); g.stroke();
-  g.font='italic 31px Georgia, serif'; g.fillStyle='#F2EFE6';
-  g.fillText('Mur de terre', 220, 190);
-  g.fillText('aux fibres végétales', 220, 234);
-  g.font='21px Segoe UI, sans-serif'; g.fillStyle='#C9C2AE';
-  g.fillText('séchage au choix', 220, 290);
-  g.fillText('naturel ou à l’étuve', 220, 320);
-  g.strokeStyle='#5F5A50'; g.lineWidth=2;
-  g.beginPath(); g.moveTo(110,356); g.lineTo(330,356); g.stroke();
-  g.font='italic 20px Georgia, serif'; g.fillStyle='#A9A294';
-  g.fillText('quatre ingrédients,', 220, 396);
-  g.fillText('un seul bon dosage', 220, 424);
-  g.fillStyle='#E8B9AE'; g.font='bold 19px Segoe UI, sans-serif';
-  g.fillText('DÉGUSTATION INTERDITE', 220, 496);
+  for(let i=0;i<2600;i++){ gf.fillStyle='rgba(255,255,255,'+(0.012+rn()*0.028)+')';
+    gf.fillRect(rn()*440, rn()*572, 1.6, 1.2); }
+  gf.strokeStyle='#7A5430'; gf.lineWidth=22; gf.strokeRect(11,11,418,550);
+  gf.strokeStyle='#5C3E22'; gf.lineWidth=4; gf.strokeRect(22,22,396,528);
+  gf.textAlign='center';
+  gf.fillStyle='#F2EFE6'; gf.font='bold 40px Georgia, serif';
+  gf.fillText('MENU DU JOUR', 220, 92);
+  gf.strokeStyle='#9C9788'; gf.lineWidth=2;
+  gf.beginPath(); gf.moveTo(84,114); gf.lineTo(356,114); gf.stroke();
+  /* l'écriture, sur un calque à part : on la découvre ligne par ligne */
+  const encre=document.createElement('canvas'); encre.width=440; encre.height=572;
+  const ge=encre.getContext('2d');
+  const BANDES = [];                       /* [y0, y1] de chaque ligne écrite */
+  const YCOCHE = {};
+  const plat = (cle, y, titre, nom, sous) => {
+    ge.textAlign='left';
+    ge.fillStyle='#A9A294'; ge.font='italic 20px Georgia, serif'; ge.fillText(titre, 62, y);
+    ge.fillStyle='#F2EFE6'; ge.font='italic 32px Georgia, serif'; ge.fillText(nom, 62, y+36);
+    ge.fillStyle='#C9C2AE'; ge.font='20px Segoe UI, sans-serif'; ge.fillText(sous, 62, y+66);
+    BANDES.push([y-20, y+6], [y+8, y+46], [y+48, y+74]);
+    YCOCHE[cle] = y + 30;
+  };
+  plat('entree',  160, 'Entrée',  'La terre',   'dosée au saladier');
+  plat('plat',    268, 'Plat',    'Le mur',     'monté brique à brique');
+  plat('dessert', 376, 'Dessert', 'Le confort', 'été comme hiver');
+  ge.strokeStyle='#5F5A50'; ge.lineWidth=2;
+  ge.beginPath(); ge.moveTo(110,470); ge.lineTo(330,470); ge.stroke(); BANDES.push([464, 476]);
+  ge.fillStyle='#E8B9AE'; ge.font='bold 19px Segoe UI, sans-serif'; ge.textAlign='center';
+  ge.fillText('DÉGUSTATION INTERDITE', 220, 506); BANDES.push([490, 516]);
   const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8;
+  peindreArdoise = () => {
+    g.drawImage(fond, 0, 0);
+    const n = BANDES.length, p = ardoiseEtat.prog * n;
+    for (let i=0;i<n;i++){
+      const f = Math.max(0, Math.min(1, p - i)); if (f <= 0) break;
+      const [y0, y1] = BANDES[i], x0 = 40, w = Math.max(1, (400 - x0)*f);
+      g.drawImage(encre, x0, y0, w, y1-y0, x0, y0, w, y1-y0);
+    }
+    /* les coches, à la craie verte */
+    g.strokeStyle='#BFE3A5'; g.lineWidth=6; g.lineCap='round'; g.lineJoin='round';
+    for (const k of ardoiseEtat.faits){ const y = YCOCHE[k];
+      g.beginPath(); g.moveTo(338, y-4); g.lineTo(352, y+10); g.lineTo(380, y-22); g.stroke(); }
+    t.needsUpdate = true;
+  };
+  peindreArdoise();
   const a=new THREE.Mesh(new THREE.PlaneGeometry(0.258,0.300),
     new THREE.MeshBasicMaterial({map:t,toneMapped:false}));
-  /* elle part sur la gauche : le centre appartient aux bocaux et à la fiche */
   /* accrochée à la crédence, à gauche : le plan de travail reste libre */
   a.position.set(-0.350, PY+0.445, -1.016); a.rotation.y = 0.17;
   scene.add(a); ardoise = a;
@@ -861,50 +908,152 @@ function lignes(g, txt, max){
     if (g.measureText(t).width > max && l){ out.push(l); l=m; } else l=t; }
   if (l) out.push(l); return out;
 }
-/* Le panneau que le visiteur lit DANS le casque : le récit, puis ce qu'il faut
-   faire. À l'écran plat c'est le bandeau HTML qui joue ce rôle. */
-const consigne = fiche(0.76,0.27,{txt:'', faire:''},(g,W,H,d)=>{
-  if(!d.txt && !d.faire) return;
-  g.fillStyle='rgba(16,12,10,.88)'; rr(g,0,0,W,H,16); g.fill();
-  g.strokeStyle='rgba(200,118,42,.45)'; g.lineWidth=3; rr(g,5,5,W-10,H-10,13); g.stroke();
-  g.textAlign='center'; g.textBaseline='middle';
-  let y = 28;
-  g.fillStyle='#E7DCC6'; g.font='italic 20px Georgia, serif';
-  for (const l of lignes(g, d.txt||'', W-46)){ g.fillText(l, W/2, y); y += 25; }
-  if (d.faire){
-    y += 7;
-    g.strokeStyle='rgba(246,240,228,.20)'; g.lineWidth=2;
-    g.beginPath(); g.moveTo(34,y-13); g.lineTo(W-34,y-13); g.stroke();
-    g.fillStyle='#F2C185'; g.font='bold 20px Segoe UI, sans-serif';
-    for (const l of lignes(g, d.faire, W-46)){ g.fillText(l, W/2, y); y += 25; }
-  }
-});
-/* Au casque, le texte est une carte posée sous la ligne de regard : elle suit
-   la tête, reste lisible partout, et ne masque jamais ce qu'on manipule. */
-consigne.position.set(0, -0.40, -1.18);
+/* ============================================================================
+   LE PANNEAU DE RÉCIT, AU CASQUE
+   L'ancienne version était un bandeau collé au regard : où qu'on regarde, il
+   était 19° plus bas, toujours opaque — donc il cachait en permanence ce qu'on
+   regardait, et son texte était coupé faute de hauteur. Celui-ci :
+     · APPARAÎT quand il y a quelque chose de nouveau à lire, le temps de le
+       lire (de 4 à 12 s selon la longueur), puis S'EFFACE complètement ;
+     · REVIENT de lui-même si le visiteur reste 14 s sans agir alors qu'on
+       attend un geste de lui — le chef qui rappelle la consigne ;
+     · s'efface dès qu'on agit (verser, mélanger…) ;
+     · suit la tête PARESSEUSEMENT : il ne bouge que si l'on tourne de plus de
+       12°, et il glisse alors en douceur — c'est ce que recommande Meta pour
+       l'interface en VR, plutôt qu'un panneau rivé au regard ;
+     · prend la hauteur de son texte : plus rien n'est coupé ;
+     · est dessiné à 960 px/m, deux fois plus fin : il était flou au casque.
+   À l'écran plat, c'est toujours le bandeau HTML du bas qui parle.
+   ============================================================================ */
+const PANNEAU_TEST = /[?&]panneau\b/.test(location.search);   /* le voir sans casque */
+const RECIT_W = 0.60, RECIT_PXM = 960, RECIT_D = 1.05;
+const recitCv = document.createElement('canvas');
+recitCv.width = Math.round(RECIT_W * RECIT_PXM);                /* 576 px */
+recitCv.height = 512;                                          /* hauteur maximale */
+const recitG = recitCv.getContext('2d');
+const recitTex = new THREE.CanvasTexture(recitCv);
+recitTex.colorSpace = THREE.SRGBColorSpace; recitTex.anisotropy = 8;
+const consigne = new THREE.Mesh(
+  new THREE.PlaneGeometry(RECIT_W, recitCv.height / RECIT_PXM),
+  new THREE.MeshBasicMaterial({ map: recitTex, transparent: true, opacity: 0,
+                                depthWrite: false, depthTest: false, toneMapped: false }));
 consigne.renderOrder = 10;
-consigne.material.depthTest = false;
-camera.add(consigne);
+consigne.visible = false;
+consigne.userData = { txt:'', faire:'', cle:'' };
+consigne.userData.redraw = () => {
+  const d = consigne.userData, g = recitG, W = recitCv.width, H = recitCv.height;
+  const PAD = 30, LW = W - 2*PAD;
+  g.font = 'italic 31px Georgia, serif';
+  const lt = d.txt ? lignes(g, d.txt, LW) : [];
+  g.font = 'bold 29px Segoe UI, sans-serif';
+  const lf = d.faire ? lignes(g, d.faire, LW) : [];
+  const haut = Math.min(H, 26 + lt.length*40 + (lf.length ? (lt.length ? 22 : 0) + lf.length*38 : 0) + 22);
+  g.clearRect(0, 0, W, H);
+  if (lt.length || lf.length){
+    g.fillStyle = 'rgba(16,12,10,.90)'; rr(g, 0, 0, W, haut, 22); g.fill();
+    g.strokeStyle = 'rgba(200,118,42,.55)'; g.lineWidth = 4; rr(g, 6, 6, W-12, haut-12, 17); g.stroke();
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    let y = 26 + 20;
+    g.fillStyle = '#E7DCC6'; g.font = 'italic 31px Georgia, serif';
+    for (const l of lt){ g.fillText(l, W/2, y); y += 40; }
+    if (lf.length){
+      if (lt.length){
+        y += 2;
+        g.strokeStyle = 'rgba(246,240,228,.22)'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(52, y-20); g.lineTo(W-52, y-20); g.stroke();
+        y += 20;
+      }
+      g.fillStyle = '#F2C185'; g.font = 'bold 29px Segoe UI, sans-serif';
+      for (const l of lf){ g.fillText(l, W/2, y); y += 38; }
+    }
+  }
+  /* on ne montre que la partie utile du canevas, et le panneau prend sa taille */
+  const f = Math.max(0.05, haut / H);
+  consigne.scale.y = f;
+  recitTex.repeat.set(1, f); recitTex.offset.set(0, 1 - f);
+  recitTex.needsUpdate = true;
+  /* un texte nouveau : on le montre */
+  const cle = (d.txt||'') + '|' + (d.faire||'');
+  if (cle !== d.cle){ d.cle = cle; if (typeof recitMontrer === 'function') recitMontrer(); }
+};
+scene.add(consigne);
+
+/* ---- la petite mécanique d'apparition ---- */
+const recit = { t0: -1e9, duree: 0, derniereAct: 0, yaw: 0, pitch: 0, suivre: false, tPrec: 0 };
+function recitMontrer(){
+  const n = (consigne.userData.txt||'').length + (consigne.userData.faire||'').length;
+  recit.t0 = performance.now();
+  recit.duree = Math.max(4, Math.min(12, 2.2 + 0.055*n));
+}
+/* les moments où l'on attend un geste du visiteur : seuls ceux-là méritent un rappel */
+function attenteAction(){
+  return phase === 'ecran' || phase === 'cuisine' || phase === 'choix' || phase === 'bilan'
+      || phase === 'dedans' || phase === 'hiver'
+      || (phase === 'mur' && typeof clefEnAttente !== 'undefined' && clefEnAttente);
+}
+const _tete = new THREE.Vector3(), _regard = new THREE.Vector3();
+const ecartAngle = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2*Math.PI; while (d < -Math.PI) d += 2*Math.PI; return d; };
+function animRecit(){
+  if (!(renderer.xr.isPresenting || PANNEAU_TEST)){ consigne.visible = false; return; }
+  const now = performance.now();
+  /* au temps réel, comme tout le récit : une machine lente ne doit pas
+     laisser traîner le panneau à l'écran */
+  const dt = Math.min(0.5, Math.max(0, (now - (recit.tPrec || now)) / 1000));
+  recit.tPrec = now;
+  const occupe = !!geste || !!mainsGeste[0] || !!mainsGeste[1];
+  if (occupe) recit.derniereAct = now;
+  const vide = !consigne.userData.txt && !consigne.userData.faire;
+  let cible = 0;
+  if (!vide && !occupe){
+    const fin = recit.t0 + recit.duree*1000;
+    if (now < fin) cible = 1;
+    else if (attenteAction() && now - Math.max(fin, recit.derniereAct) > 14000){ recitMontrer(); cible = 1; }
+  }
+  const o = consigne.material.opacity;
+  consigne.material.opacity = o + (cible - o) * (1 - Math.exp(-dt * (cible > o ? 8 : 3.5)));
+  consigne.visible = consigne.material.opacity > 0.01;
+
+  /* le suivi paresseux : 17° sous le regard, à 1,05 m */
+  camera.getWorldPosition(_tete); camera.getWorldDirection(_regard);
+  const yv = Math.atan2(_regard.x, _regard.z);
+  const pv = Math.max(-1.0, Math.min(0.25, Math.asin(Math.max(-1, Math.min(1, _regard.y))) - 0.30));
+  if (consigne.material.opacity < 0.03){ recit.yaw = yv; recit.pitch = pv; recit.suivre = false; }
+  else {
+    const dy = ecartAngle(yv, recit.yaw), dp = pv - recit.pitch, dd = Math.hypot(dy, dp);
+    if (dd > 0.21) recit.suivre = true;
+    if (recit.suivre){
+      const k = Math.min(1, dt*3.2);
+      recit.yaw += dy*k; recit.pitch += dp*k;
+      if (dd < 0.03) recit.suivre = false;
+    }
+  }
+  const cp = Math.cos(recit.pitch);
+  consigne.position.set(_tete.x + Math.sin(recit.yaw)*cp*RECIT_D,
+                        _tete.y + Math.sin(recit.pitch)*RECIT_D,
+                        _tete.z + Math.cos(recit.yaw)*cp*RECIT_D);
+  consigne.lookAt(_tete);
+}
 
 const S = (id) => document.getElementById(id);
 
 /* ===================== SON : tout est synthétisé, aucun fichier ===================== */
-let AC=null, bruit=null;
+let AC=null, bruit=null, busSortie=null;
 function audioDemarre(){
-  if(AC) return;
+  if(AC){ if (AC.state === 'suspended') AC.resume(); return; }
   try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+  busSortie = AC.createGain(); busSortie.gain.value = 1; busSortie.connect(AC.destination);
   const n = AC.sampleRate*2, buf = AC.createBuffer(1,n,AC.sampleRate), d = buf.getChannelData(0);
   for(let i=0;i<n;i++) d[i] = Math.random()*2-1;
   bruit = buf;
 }
 function source(){ const s=AC.createBufferSource(); s.buffer=bruit; s.loop=true; return s; }
 let flot=null;
-function sonVerser(on, aigu){
+function sonVerser(on, aigu, pos){
   if(!AC) return;
   if(on && !flot){
     const s=source(), f=AC.createBiquadFilter(), g=AC.createGain();
     f.type='bandpass'; f.frequency.value= aigu? 2400 : 900; f.Q.value=0.8;
-    g.gain.value=0; s.connect(f); f.connect(g); g.connect(AC.destination); s.start();
+    g.gain.value=0; s.connect(f); f.connect(g); g.connect(sortieAudio(pos)); s.start();
     g.gain.linearRampToValueAtTime(0.13, AC.currentTime+0.12);
     flot={s,g,f,base:(aigu?2400:900)};
   } else if(!on && flot){
@@ -920,7 +1069,7 @@ function sonVerserHauteur(t){
 /* le crachotement d'une imprimante de comptoir */
 function sonImprimante(){
   if(!AC){ audioDemarre(); if(!AC) return; }
-  for (let i=0;i<9;i++) setTimeout(()=>sonCourt(180 + (i%3)*60, 0.035, 'square'), i*70);
+  for (let i=0;i<9;i++) setTimeout(()=>sonCourt(180 + (i%3)*60, 0.035, 'square', ECRAN_A), i*70);
 }
 /* le « tac » sec d'une terre qui se fend */
 function sonFissure(){
@@ -929,18 +1078,18 @@ function sonFissure(){
   f.type='highpass'; f.frequency.value=1800;
   g.gain.setValueAtTime(0.30, AC.currentTime);
   g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+0.14);
-  s2.connect(f); f.connect(g); g.connect(AC.destination);
+  s2.connect(f); f.connect(g); g.connect(busSortie);
   s2.start(); s2.stop(AC.currentTime+0.16);
   sonCourt(1200, 0.05, 'square');
 }
-function sonCourt(freq, duree, type){
+function sonCourt(freq, duree, type, pos){
   if(!AC) return;
   const o=AC.createOscillator(), g=AC.createGain();
   o.type=type||'sine'; o.frequency.setValueAtTime(freq, AC.currentTime);
   o.frequency.exponentialRampToValueAtTime(freq*0.5, AC.currentTime+duree);
   g.gain.setValueAtTime(0.22, AC.currentTime);
   g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+duree);
-  o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+duree+0.02);
+  o.connect(g); g.connect(sortieAudio(pos, duree+0.3)); o.start(); o.stop(AC.currentTime+duree+0.02);
 }
 let remue=null;
 function sonRemuer(on){
@@ -948,7 +1097,7 @@ function sonRemuer(on){
   if(on && !remue){
     const s=source(), f=AC.createBiquadFilter(), g=AC.createGain();
     f.type='lowpass'; f.frequency.value=520;
-    g.gain.value=0.10; s.connect(f); f.connect(g); g.connect(AC.destination); s.start();
+    g.gain.value=0.10; s.connect(f); f.connect(g); g.connect(sortieAudio(saladier.position)); s.start();
     remue={s,g};
   } else if(!on && remue){
     remue.g.gain.linearRampToValueAtTime(0, AC.currentTime+0.12);
@@ -970,6 +1119,10 @@ const pct = (m) => solides() > 0 ? m / solides() * 100 : 0;
 
 /* ---- ciblage ---- */
 const rayon = new THREE.Raycaster();
+/* on retient le dernier impact : il donne la longueur du rayon et la place du réticule */
+{ const io = rayon.intersectObject.bind(rayon), ios = rayon.intersectObjects.bind(rayon);
+  rayon.intersectObject  = (o, r, t) => { const h = io(o, r, t);  if (h[0]) rayon.dernier = h[0]; return h; };
+  rayon.intersectObjects = (o, r, t) => { const h = ios(o, r, t); if (h[0]) rayon.dernier = h[0]; return h; }; }
 const ptr = new THREE.Vector2();
 const cibles = [];
 for (const n in bocaux) bocaux[n].traverse(o=>{ if(o.isMesh){ o.userData.bocal=n; cibles.push(o); } });
@@ -1084,6 +1237,9 @@ window.FDS = {
   _cadre: (f, q, z) => { if (f){ camera.fov=f; camera.updateProjectionMatrix(); }
                          if (z!=null) rig.position.z = z;
                          yaw=0; pitch=q; vYaw=vPitch=0; },
+  _recit: () => ({ op:+consigne.material.opacity.toFixed(2), vis: consigne.visible,
+                   age: +((performance.now()-recit.t0)/1000).toFixed(1), duree:+recit.duree.toFixed(1),
+                   h: +consigne.scale.y.toFixed(2), txt: consigne.userData.txt, faire: consigne.userData.faire }),
   _retrait: () => ({ form: formulation, V: retraitVisiteur, T: retraitTemoin,
                      ampli, ech: echelleRetrait,
                      sc: { v: briqueSeche.scale.toArray().map(n=>+n.toFixed(3)),
@@ -1092,7 +1248,7 @@ window.FDS = {
     scene.background=cielFond;
     for (const b of briques){ b.position.copy(b.userData.cible); b.visible=true; }
     for (const m of revelations){ m.pose=true; for (const o of m.objets) o.visible=true; }
-    gMaison.visible=true; gMaison.scale.set(1,1,1); panneauMur.visible=false;
+    gMaison.visible=true; gMaison.scale.set(1,1,1); panneauMur.visible=false; fusionnerMur();
     jour.position.set(6.0,8.0,ZC+5.0); jour.target.position.set(0,1.0,ZC-1.8);
     jour.target.updateMatrixWorld(); jour.intensity=2.1; suspension.intensity=0;
     rig.position.set(0,0,ZC+d); yaw=0; pitch=-0.06; },
@@ -1107,7 +1263,7 @@ window.FDS = {
                 scene.background=cielFond;
                 for (const b of briques){ b.position.copy(b.userData.cible); b.visible=true; }
                 for (const m of revelations){ m.pose=true; for (const o of m.objets) o.visible=true; }
-                gMaison.visible=true; gMaison.scale.set(1,1,1); ouvrirActe5(); }
+                gMaison.visible=true; gMaison.scale.set(1,1,1); fusionnerMur(); ouvrirActe5(); }
   }
 };
 
@@ -1124,7 +1280,7 @@ function debutVersement(nom){
      sur un tasseau, les remettre à la hauteur du plan les ferait plonger. */
   verseEnCours = { nom, b, base:b.rotation.z, baseY:b.position.y, t:performance.now() };
   flux.material.color.setHex(TEINTE[nom]);
-  audioDemarre(); sonVerser(true, nom==='EAU');
+  audioDemarre(); sonVerser(true, nom==='EAU', saladier.position);
 }
 function finVersement(){
   if(!verseEnCours) return;
@@ -1168,8 +1324,8 @@ function mouler(){
   if (dansMoule) return;
   if (melange < 0.75 || !consistanceOk() || solides() < 400) return;
   dansMoule = true;
-  audioDemarre(); sonCourt(120, 0.22, 'triangle');
-  setTimeout(()=>{ for(const w of parois) w.visible=false; sonCourt(210,0.16,'sine'); }, 700);
+  audioDemarre(); sonImpact(moule.position, 420); sonCourt(120, 0.22, 'triangle', moule.position);
+  setTimeout(()=>{ for(const w of parois) w.visible=false; sonCourt(210,0.16,'sine', moule.position); }, 700);
   maj();
   apres(3.2, ouvrirActe3);
 }
@@ -1593,7 +1749,7 @@ function cuire(b){
   apres(1.4, () => tache(0.5, u => { porte.rotation.x = -1.35*(1-lisse(u)); }));
   /* la braise monte, puis retombe */
   apres(1.9, () => {
-    sonCourt(140, 0.5, 'sine');
+    sonCourt(140, 0.5, 'sine', four.position); vapeurFour(3.4);
     tache(3.4, u => { const k = Math.sin(Math.PI*Math.min(1,u*1.25));
       mBraise.opacity = 0.34*k; feu.intensity = 1.1*k;
       b.material.color.setHSL(0.072, 0.40 - 0.11*u, 0.150 + 0.095*u);
@@ -1605,6 +1761,7 @@ function cuire(b){
   });
 }
 function sortirDuFour(b){
+  sonMinuteur(four.position);
   tache(0.5, u => { porte.rotation.x = -1.35*lisse(u); });
   apres(0.4, () => tache(0.9, u => {
     b.position.lerpVectors(new THREE.Vector3(-0.212,PY+0.122,-0.775), POSE_SEUL, lisse(u));
@@ -1614,6 +1771,7 @@ function sortirDuFour(b){
 }
 
 function secher(b){
+  vapeurClaie(4.2);
   dire('Pas d’étuve. Le soleil et le vent suffisent.');
   dirFaire('Plusieurs jours, aucune dépense. <b>Le volume diminue aussi&nbsp;: c’est le retrait.</b>');
   tache(1.2, u => { soleil.intensity = 5.5*lisse(u); rai.material.opacity = 0.16*lisse(u); });
@@ -1743,7 +1901,7 @@ function comparer(){
        ? 'Votre brique est sortie de l’étuve. Voilà ce que l’autre chemin aurait demandé.'
        : 'Votre brique a séché à l’air. Voilà ce que l’étuve aurait demandé.');
   dirFaire('Quelques pour cent de retrait, invisibles à l’œil. <b>Amplifiez l’échelle.</b>');
-  majFicheBilan();
+  majFicheBilan(); cocherArdoise('entree');
   apres(9.0, () => beatRetrait());
 }
 
@@ -1864,6 +2022,7 @@ function poseBrique(geo, x, y){
 /* le mortier : un fond plein derrière chaque trumeau, pour qu'on ne voie pas
    le paysage à travers les joints */
 const revelations = [];   /* tout ce qui apparaît quand le mur atteint sa hauteur */
+const mortiers = [];      /* les fonds de mortier, fusionnés une fois le mur fermé */
 for (let r=0; r<RANGS; r++){
   const y = Y0 + r*HRANG;
   const pair = (r % 2 === 0);
@@ -1871,7 +2030,7 @@ for (let r=0; r<RANGS; r++){
     const larg = (b-a)*MOD - JOINT;
     const f = box(larg + 0.006, HRANG + 0.004, BE - 0.032, mMortier,
                   (xM(a) + xM(b) - JOINT)/2, y, -1.806, gChantier);
-    f.castShadow = false; f.visible = false; f.userData.th = 'mur';
+    f.castShadow = false; f.visible = false; f.userData.th = 'mur'; mortiers.push(f);
     revelations.push({ y: y - 0.02, objets:[f] });
 
     if (pair){
@@ -1888,7 +2047,7 @@ for (let r=0; r<RANGS; r++){
 {
   const cour = box(LONG + 0.10, 0.055, BE + 0.06, mMortier, 0, Y0 + RANGS*HRANG - BH/2 + 0.028, -1.80, gChantier);
   cour.visible = false; cour.userData.th = 'mur';
-  revelations.push({ y: Y0 + (RANGS-1)*HRANG, objets:[cour] });
+  revelations.push({ y: 99, objets:[cour] });   /* posé quand la dernière brique est en place */
 }
 
 /* ------------------------------------------------------------------
@@ -1936,9 +2095,10 @@ function poseTardive(y, ...objets){
     /* petit bois horizontal */
     box(lv, 0.024, 0.030, mChene, cx + c*(0.021 + lv/2), (yB+yH)/2, Z, gChantier);
   }
-  /* volets rabattus contre le mur */
-  const vg = box(0.30, H-0.02, 0.028, mVolet, b.x0-0.155, (yB+yH)/2, Z+0.058, gChantier);
-  const vd = box(0.30, H-0.02, 0.028, mVolet, b.x1+0.155, (yB+yH)/2, Z+0.058, gChantier);
+  /* volets rabattus CONTRE le mur, pas dedans : à Z+0,058 ils traversaient le
+     parement, et une brique sur deux laissait voir le volet (z-fighting) */
+  const vg = box(0.30, H-0.02, 0.028, mVolet, b.x0-0.155, (yB+yH)/2, Z+BE/2+0.020, gChantier);
+  const vd = box(0.30, H-0.02, 0.028, mVolet, b.x1+0.155, (yB+yH)/2, Z+BE/2+0.020, gChantier);
   poseTardive(yB, appui, db);
   poseTardive(yH, lint, dg, dd, dh, meneau, vg, vd, ...vitres);
   gChantier.userData.fenetre = { cx, cy:(yB+yH)/2, L, H, yB, yH, vitres,
@@ -1990,13 +2150,14 @@ const TAS = new THREE.Vector3(-1.35, 0.20, -0.95);
    ---------------------------------------------------------------------------- */
 let briqueClef = null;
 {
-  /* On la choisit À HAUTEUR DE REGARD et au milieu : le trou qu'elle laisse
-     doit se voir dans le cadrage, sinon le geste ne veut rien dire. */
-  const VISE = new THREE.Vector2(0, SOUBA + 1.18);
+  /* La dernière brique ferme le DERNIER RANG, au milieu : c'est là qu'un
+     maçon pose la dernière, pas au milieu d'un mur déjà monté. */
+  const VISE = new THREE.Vector2(0, Y0 + (RANGS-1)*HRANG);
   let d2 = Infinity;
   for (const b of briques){
     const c = b.userData.cible;
-    const d = (c.x - VISE.x)*(c.x - VISE.x) + (c.y - VISE.y)*(c.y - VISE.y);
+    if (Math.abs(c.y - VISE.y) > 0.01) continue;      /* le dernier rang, et lui seul */
+    const d = (c.x - VISE.x)*(c.x - VISE.x);
     if (d < d2){ d2 = d; briqueClef = b; }
   }
   if (briqueClef) briqueClef.userData.clef = true;
@@ -2077,7 +2238,10 @@ function graverRecette(){
 /* --- la maison qui se referme --- */
 const gMaison = new THREE.Group(); gMaison.visible = false; gChantier.add(gMaison);
 const PROF = 4.20, HAUT = Y0 + RANGS*HRANG;      /* une vraie pièce, où l'on peut reculer */
-const PENTE = 0.42, RIDGE = 1.24;                /* inclinaison et hauteur de faîtage */
+/* La sous-face de la toiture s'appuie sur les murs : sa pente part de
+   l'arête des pignons (demi-largeur PROF/2 + 0,12 m) et monte jusqu'au faîtage.
+   Avant, le versant était posé 33 cm au-dessus du mur : on voyait le vide. */
+const PENTE = 0.42, RIDGE = (PROF/2 + 0.12) * Math.tan(PENTE);   /* ≈ 0,99 m de faîtage */
 {
   /* les trois autres murs, en enduit de terre : on ne remonte pas 400 briques */
   const mur = (w,h,d,x,y,z,ry)=>{ const m=box(w,h,d,mEnduit,x,y,z,gMaison); m.rotation.y=ry||0; return m; };
@@ -2093,7 +2257,9 @@ const PENTE = 0.42, RIDGE = 1.24;                /* inclinaison et hauteur de fa
     for (const c of [-1, 1]){
       const m = new THREE.Mesh(geo, mEnduit);
       m.rotation.y = Math.PI/2;
-      m.position.set(c*(LONG/2-0.15) + 0.14, HAUT, -1.80-PROF/2);
+      /* l'extrusion part vers +x : on recule de son épaisseur pour que
+         chaque pignon tombe pile sur son mur (l'un débordait dehors) */
+      m.position.set(c*(LONG/2-0.15) - 0.14, HAUT, -1.80-PROF/2);
       m.castShadow = m.receiveShadow = true; gMaison.add(m);
     }
   }
@@ -2102,11 +2268,13 @@ const PENTE = 0.42, RIDGE = 1.24;                /* inclinaison et hauteur de fa
   const pente = new THREE.Group(); pente.position.set(0, HAUT, -1.80-PROF/2); gMaison.add(pente);
   gMaison.userData.pente = pente;
   const dPan = PROF/2 + 0.92;
+  const zc = (dPan/2)*Math.cos(PENTE);            /* milieu du versant, en plan */
+  const yc = RIDGE - Math.tan(PENTE)*zc + 0.045/Math.cos(PENTE) + 0.004;   /* sous-face sur la pente */
   for (const c of [-1, 1]){
-    const p = box(LONG+0.98, 0.09, dPan, mTuile, 0, RIDGE/2 + 0.02, c*(PROF/4 + 0.46), pente);
+    const p = box(LONG+0.98, 0.09, dPan, mTuile, 0, yc, c*zc, pente);
     p.rotation.x = c*PENTE;
   }
-  box(LONG+1.02, 0.09, 0.28, mTuile, 0, RIDGE, 0, pente);
+  box(LONG+1.02, 0.09, 0.30, mTuile, 0, RIDGE + 0.085, 0, pente);
   /* cheminée, plantée dans le versant, sortant du faîtage */
   box(0.34, 1.30, 0.34, mEnduit, -LONG*0.26, RIDGE - 0.10, 0.10, pente);
   box(0.44, 0.09, 0.44, mTuile,  -LONG*0.26, RIDGE + 0.60, 0.10, pente);
@@ -2142,7 +2310,7 @@ function ouvrirActe4(){
     jour.shadow.camera.updateProjectionMatrix();
     suspension.intensity = 0;
     const portrait = innerHeight > innerWidth;
-    rig.position.set(0, 0, ZC + (portrait ? 1.85 : 1.05));
+    rig.position.set(0, rigY, ZC + (portrait ? 1.85 : 1.05));
     yaw = 0; pitch = portrait ? -0.06 : -0.05; vYaw = vPitch = 0;
     /* la couleur des briques est celle de la pâte du visiteur */
     const teinte = briqueSeche.material.color;
@@ -2156,10 +2324,11 @@ function ouvrirActe4(){
     graverRecette();
     dire('Voilà ce que votre recette devient.');
     dirFaire('Regardez : le mur se monte. <b>Gardez-en une pour la fin.</b>');
-  }, () => poserSuite());
+  }, () => { poserSuite(); apres(5.5, oiseauPasse); });
 }
 
 function poserSuite(){
+  if (murFus) return;               /* le mur a déjà été fusionné (saut d'acte) */
   if (poseIdx >= briques.length) return demanderClef();
   const b = briques[poseIdx++];
   if (b.userData.clef) return poserSuite();          /* celle-là, c'est la sienne */
@@ -2177,9 +2346,12 @@ function poserSuite(){
     b.position.y += Math.sin(Math.PI*k)*(0.55 - 0.30*av);
     b.rotation.y *= (1-k);
   }, () => {
+    if (murFus){ b.visible = false; return; }
     b.position.copy(arr); b.rotation.set(0,0,0);
-    sonPose();
-    if (poseIdx % 7 === 0) sonTruelle();
+    const pm = b.getWorldPosition(new THREE.Vector3());
+    sonPose(pm);
+    if (poseIdx % 7 === 0) sonTruelle(pm);
+    poussiereBrique(arr);
     cordeau.position.y = arr.y + BH/2 + JOINT;
     panneauMur.userData.n = poseIdx; panneauMur.userData.redraw();
     for (const m of revelations){
@@ -2248,7 +2420,7 @@ function poserClef(auto){
   }, () => {
     b.position.copy(arr); b.rotation.set(0,0,0);
     empreinteClef.visible = false; haloClef.visible = false;
-    sonPose(); sonTruelle();
+    { const pm = b.getWorldPosition(new THREE.Vector3()); sonPose(pm); sonTruelle(pm); poussiereBrique(arr); }
     panneauMur.userData.n = briques.length; panneauMur.userData.redraw();
     for (const m of revelations){
       if (!m.pose){ m.pose = true; for (const o of m.objets) o.visible = true; }
@@ -2258,6 +2430,8 @@ function poserClef(auto){
 }
 
 function finirMur(){
+  for (const m of revelations){ if (!m.pose){ m.pose = true; for (const o of m.objets) o.visible = true; } }
+  fusionnerMur(); cocherArdoise('plat');
   cordeau.visible = false; filPlomb.visible = false; treteau.visible = false;
   panneauMur.userData.txt = 'toutes sorties de votre recette';
   panneauMur.userData.redraw();
@@ -2265,7 +2439,7 @@ function finirMur(){
   apres(2.2, () => {
     fondu(0.8, () => {
       const portrait = innerHeight > innerWidth;
-      rig.position.set(0, 0, ZC + (portrait ? 4.20 : 2.70));
+      rig.position.set(0, rigY, ZC + (portrait ? 4.20 : 2.70));
       pitch = -0.05; yaw = 0; vYaw = vPitch = 0;
       panneauMur.visible = false;
     }, () => {
@@ -2280,9 +2454,9 @@ function finirMur(){
 }
 
 /* petit son mat de pose */
-function sonPose(){ audioDemarre(); sonCourt(150 + Math.random()*40, 0.07, 'triangle'); }
+function sonPose(pos){ audioDemarre(); sonImpact(pos, 520 + Math.random()*260); sonCourt(150 + Math.random()*40, 0.07, 'triangle', pos); }
 /* le raclement de la truelle sur le mortier */
-function sonTruelle(){
+function sonTruelle(pos){
   if(!AC){ audioDemarre(); if(!AC) return; }
   const s2=source(), f=AC.createBiquadFilter(), g=AC.createGain();
   f.type='bandpass'; f.frequency.setValueAtTime(1400, AC.currentTime);
@@ -2291,7 +2465,7 @@ function sonTruelle(){
   g.gain.setValueAtTime(0.0, AC.currentTime);
   g.gain.linearRampToValueAtTime(0.12, AC.currentTime+0.05);
   g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+0.30);
-  s2.connect(f); f.connect(g); g.connect(AC.destination);
+  s2.connect(f); f.connect(g); g.connect(sortieAudio(pos, 0.6));
   s2.start(); s2.stop(AC.currentTime+0.32);
 }
 
@@ -2677,7 +2851,7 @@ function ouvrirActe5(){
     panneauMur.visible = false;
     jour.intensity = 0.5;
     const portrait = innerHeight > innerWidth;
-    rig.position.set(0, 0, ZC + Z_MUR - (portrait ? 3.00 : 2.25));
+    rig.position.set(0, rigY, ZC + Z_MUR - (portrait ? 3.00 : 2.25));
     yaw = Math.PI; pitch = portrait ? -0.13 : -0.11; vYaw = vPitch = 0;
     cadran.userData.t = DONNEES.exterieur.temp;
     cadran.userData.h = DONNEES.exterieur.hum;
@@ -2761,13 +2935,14 @@ function finir(){
     chaleurHTML.style.opacity = '0';
     S('dedans').hidden = true; S('hiver').hidden = true;
     if (sauvegardeMat){ for (const [o,m] of sauvegardeMat) o.material = m; sauvegardeMat = null; }
-    enThermique = false; hiverActif = false; gHiver.visible = false; cielHiver.intensity = 0;
+    restaurerFusion();
+    enThermique = false; hiverActif = false; gHiver.visible = false; cielHiver.intensity = 0; givrer(false);
     jour.color.setHex(0xFFE9C6);
     scene.background = new THREE.Color(0x0C0908);
     jour.position.set(4.6,3.4,2.2); jour.target.position.set(0,0.9,-0.4);
-    jour.target.updateMatrixWorld(); jour.intensity = 0.95; suspension.intensity = 2.2;
+    jour.target.updateMatrixWorld(); jour.intensity = 0.95; suspension.intensity = SUSP_I;
     const portrait = innerHeight > innerWidth;
-    rig.position.set(0, 0, portrait ? 0.34 : 0.50);
+    rig.position.set(0, rigY, portrait ? 0.34 : 0.50);
     yaw = 0; pitch = portrait ? PITCH_CUISINE : -0.30; vYaw = vPitch = 0;
     gMiseEnPlace.visible = true; gMiseEnPlace.position.y = 0;
     /* le saladier est desservi sur le côté : il donne l'échelle sans gêner */
@@ -2804,13 +2979,16 @@ function finir(){
       etiqRG.rotation.x = -0.78; etiqRD.rotation.x = -0.78;
       etiqRG.visible = etiqRD.visible = true;
       etiqRG.scale.setScalar(1); etiqRD.scale.setScalar(1);
+      /* sous cloche : on la découvre, comme un plat qu'on sert */
+      etiqRG.visible = etiqRD.visible = false; poserCloche(FIN_G);
       carte.userData.mode = 'carte'; carte.userData.redraw();
     } else {
-      briqueSeche.visible = true; briqueSeche.position.copy(FIN_G);
+      briqueSeche.visible = true; briqueSeche.position.copy(FIN_G); poserCloche(FIN_G);
       carte.userData.mode = 'carte'; carte.userData.redraw();
     }
   }, () => {
     phase = 'fin';
+    leverCloche();
     dire('Une brique, c’est une recette.');
     dirFaire('Merci. <b>Passez le casque au suivant</b> — appuyez sur « Recommencer ».');
   });
@@ -3173,6 +3351,7 @@ function peindreThermique(){
   const T = tempsSurface();
   gChantier.traverse(o => {
     if (!o.isMesh || o === pupitre || gHiver === o.parent) return;
+    if (o.userData.fusion){ peindreFusion(o, T); return; }
     const k = o.userData.th || 'froid';
     let t;
     if (k === 'mur' || k === 'fenetre' || k === 'porte'){
@@ -3199,6 +3378,7 @@ function vueThermique(on){
     dire('La chaleur qui sort du bâtiment, rendue visible.');
   } else {
     if (sauvegardeMat) for (const [o,m] of sauvegardeMat) o.material = m;
+    restaurerFusion();
     scene.background = cielHiverFond;
     jour.intensity = 0.85; cielHiver.intensity = 0.55;
     dire('Dix degrés dehors. Le chauffage tourne à l’intérieur.');
@@ -3230,7 +3410,7 @@ function tempSousReticule(px, py){
      a été coloré : la valeur affichée et la couleur sous le réticule sont
      alors forcément la même chose. */
   if (k === 'mur' || k === 'fenetre' || k === 'porte'){
-    const c = new THREE.Vector3(); h.object.getWorldPosition(c);
+    const c = centreTouche(h);
     return { t: champT(c.x, c.y), d: h.distance, quoi:k };
   }
   return { t: (T[k] !== undefined ? T[k] : T.froid), d: h.distance, quoi:k };
@@ -3462,9 +3642,10 @@ function ouvrirActe6(){
     cielHiver.intensity = 0.55;
     /* givre sur l'herbe */
     gChantier.traverse(o => { if (o.isMesh && o.material === mHerbe) o.material.color.setHex(0xB9C4AE); });
+    givrer(true);   /* les vitres prennent le givre */
     const portrait = innerHeight > innerWidth;
     const dRecul = portrait ? 2.85 : 2.20;
-    rig.position.set(0, 0, ZC + dRecul);
+    rig.position.set(0, rigY, ZC + dRecul);
     gHiver.position.set(0, 0, dRecul - 1.45);   /* toujours à portée de bras */
     yaw = 0; pitch = portrait ? -0.20 : -0.12; vYaw = vPitch = 0;
     murChoisi = 'terre'; consigne6 = TH.consigneDefaut; enThermique = false;
@@ -3805,6 +3986,7 @@ function choisirCritere(k){
 function passerAuPlanDeTravail(){
   if (phase !== 'ecran') return;
   phase = 'cuisine';
+  ecrireArdoise();
   S('critere').hidden = true;
   /* l'écran se range à droite, la mise en place monte */
   tache(1.2, u => {
@@ -3825,6 +4007,7 @@ function passerAuPlanDeTravail(){
     gEcran.visible = false;
     moule.visible = true;
     carte.visible = true;
+    t0Cuisine = performance.now(); acte = -1;
     dire('Quatre ingrédients. À vous de jouer.');
     dirFaire('La commande est sur le comptoir. <b>Maintenez le doigt sur un bocal</b> pour verser.');
     maj();
@@ -3832,16 +4015,23 @@ function passerAuPlanDeTravail(){
 }
 
 /* ===================== DÉROULÉ (acte 1 et 2 pour l'instant) ===================== */
+/* Les petites phrases du chef pendant la cuisine. Le chronomètre part quand
+   le visiteur arrive au plan de travail, pas à l'écran d'accueil — et au
+   temps réel. (« Commencez par l'eau » contredisait la consigne, qui dit de
+   commencer par la terre : retirée.) */
 const ACTES=[
-  {t:0,  txt:'Aujourd’hui, on cuisine un mur.'},
-  {t:14, txt:'Quatre ingrédients. Commencez par l’eau.'},
-  {t:40, txt:'Trop d’eau, la pâte colle. Pas assez, elle s’effrite.'},
-  {t:72, txt:'Ajoutez des fibres. La fiche note votre recette.'},
-  {t:110,txt:'Quand la pâte est prête, elle prend le moule.'}
+  {t:0,  txt:null},
+  {t:22, txt:'Trop d’eau, la pâte colle. Pas assez, elle s’effrite.'},
+  {t:48, txt:'Les fibres, c’est la paille du torchis : elles limitent le retrait.'},
+  {t:80, txt:'Quand la pâte est prête, elle prend le moule.'}
 ];
-let t0=0, acte=-1, actif=false;
-function majActe(t){ if (phase !== 'cuisine') return; let i=0; for(let k=0;k<ACTES.length;k++) if(t>=ACTES[k].t) i=k;
-  if(i!==acte){ acte=i; consigne.userData.txt=ACTES[i].txt; consigne.userData.redraw();
+let t0=0, acte=-1, actif=false, t0Cuisine=0;
+function majActe(){
+  if (phase !== 'cuisine' || !t0Cuisine) return;
+  const t = (performance.now() - t0Cuisine)/1000;
+  let i=0; for(let k=0;k<ACTES.length;k++) if(t>=ACTES[k].t) i=k;
+  if(i!==acte){ acte=i; if (!ACTES[i].txt) return;
+    consigne.userData.txt=ACTES[i].txt; consigne.userData.redraw();
     const c2=document.getElementById('consigne2'); if(c2) c2.textContent=ACTES[i].txt; } }
 
 /* ===================== REGARD ===================== */
@@ -3915,6 +4105,52 @@ el.addEventListener('touchend',  e=>{ const t=e.changedTouches[0];
   if(t) fin(t.clientX,t.clientY,{clientX:t.clientX,clientY:t.clientY}); },{passive:true});
 /* ---- les manettes : on vise, on maintient, on relâche, comme au doigt ---- */
 const mainsGeste = [null, null];
+const rayonsVR = [];
+function creerRayonVR(c){
+  const geo = new THREE.CylinderGeometry(0.55, 1, 1, 10, 1, true);
+  geo.translate(0, 0.5, 0); geo.rotateX(-Math.PI/2);          /* de 0 à -1 sur z, comme le rayon */
+  const coeur = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color:0xFFF4E2, transparent:true,
+    opacity:0.95, depthWrite:false, toneMapped:false }));
+  coeur.scale.set(0.0024, 0.0024, 1.4); coeur.renderOrder = 15;
+  const halo = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color:0xE8A860, transparent:true,
+    opacity:0.28, depthWrite:false, toneMapped:false, blending:THREE.AdditiveBlending }));
+  halo.scale.set(0.0070, 0.0070, 1.4); halo.renderOrder = 14;
+  const bout = new THREE.Mesh(new THREE.SphereGeometry(0.0075, 12, 8),
+    new THREE.MeshBasicMaterial({ color:0xFFF4E2, toneMapped:false }));
+  c.add(coeur, halo, bout);
+  /* le réticule : un anneau clair cerclé de sombre, lisible sur la faïence
+     blanche comme sur le ciel ; toujours dessiné par-dessus */
+  const ret = new THREE.Group(); ret.visible = false;
+  const mk = (g, col, op) => { const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color:col,
+      transparent:true, opacity:op, depthTest:false, depthWrite:false, toneMapped:false }));
+    m.renderOrder = 20; ret.add(m); return m; };
+  mk(new THREE.RingGeometry(0.0155, 0.0225, 40), 0x000000, 0.55);
+  const anneau = mk(new THREE.RingGeometry(0.0095, 0.0160, 40), 0xFFF4E2, 1);
+  const point  = mk(new THREE.CircleGeometry(0.0035, 16), 0xFFF4E2, 1);
+  scene.add(ret);
+  rayonsVR.push({ c, coeur, halo, ret, anneau, point });
+}
+const _teteVR = new THREE.Vector3();
+function majRayonsVR(){
+  if (!renderer.xr.isPresenting){ for (const r of rayonsVR) r.ret.visible = false; return; }
+  rig.updateMatrixWorld(true);
+  camera.getWorldPosition(_teteVR);
+  for (const r of rayonsVR){
+    if (!r.c.visible){ r.ret.visible = false; continue; }
+    rayon.dernier = null;
+    const t = rayonManette(r.c);
+    const h = t ? rayon.dernier : null;
+    const L = h ? Math.max(0.05, h.distance) : 1.4;
+    r.coeur.scale.z = r.halo.scale.z = L;
+    /* sur une cible, tout passe à l'orange : on sait qu'on peut appuyer */
+    const coul = t ? 0xFFB54D : 0xFFF4E2;
+    r.coeur.material.color.setHex(coul); r.anneau.material.color.setHex(coul); r.point.material.color.setHex(coul);
+    r.halo.material.opacity = t ? 0.55 : 0.28;
+    r.ret.visible = !!h;
+    if (h){ r.ret.position.copy(h.point); r.ret.lookAt(_teteVR);
+            r.ret.scale.setScalar(Math.max(0.5, h.distance)); }
+  }
+}
 function rayonManette(c){
   const m = new THREE.Matrix4().identity().extractRotation(c.matrixWorld);
   rayon.ray.origin.setFromMatrixPosition(c.matrixWorld);
@@ -3923,11 +4159,10 @@ function rayonManette(c){
 }
 for (const i of [0,1]){
   const c = renderer.xr.getController(i);
-  /* un rayon visible, sinon on ne sait pas où l'on pointe */
-  const trait = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1.6)]),
-    new THREE.LineBasicMaterial({ color:0xE8A860, transparent:true, opacity:0.55 }));
-  c.add(trait);
+  /* un rayon visible : un vrai faisceau (une ligne WebGL ne fait qu'un pixel
+     de large dans le casque) et un réticule là où il touche */
+  creerRayonVR(c);
+  c.addEventListener('squeezestart', () => { calerHauteur(); sonCourt(520, 0.08, 'sine'); });
   c.addEventListener('selectstart', () => {
     const t = rayonManette(c);
     mainsGeste[i] = t;
@@ -3952,7 +4187,11 @@ for (const i of [0,1]){
     else if (t.quoi === 'cam6'){ vueThermique(!enThermique); commenter6(); }
     else if (t.quoi === 'fin6') nuitPuisFin();
   });
-  scene.add(c);
+  /* LES MANETTES VONT AVEC LE VISITEUR. Posées dans la scène, elles
+     restaient à l'origine quand on le déplaçait : décalées dans la cuisine,
+     à soixante mètres derrière lui sur le chantier — d'où des rayons
+     invisibles et des boutons qu'on ne pouvait pas viser. */
+  rig.add(c);
 }
 /* au casque, mélanger = maintenir la gâchette sur le saladier */
 function remuerManettes(dt){
@@ -3991,6 +4230,11 @@ function animPlan(dt){
 /* le fil à plomb oscille et s'amortit : trois lignes, et le mur devient un chantier */
 function animChantier(){
   const now = performance.now()/1000;
+  /* le temps passe pendant que le mur monte : le soleil tourne un peu */
+  if (phase === 'mur' && poseIdx > 0 && !clefPosee){
+    const k = Math.min(1, poseIdx / briques.length);
+    jour.position.set(6.0 - 2.5*k, 8.0 + 0.6*Math.sin(Math.PI*k), ZC + 5.0);
+  }
   if (filPlomb.visible){
     const t = now - (filPlomb.userData.t0 || 0)/1000;
     filPlomb.rotation.z = 0.14 * Math.exp(-t/9) * Math.sin(t*2.4);
@@ -4110,15 +4354,812 @@ function animVitrine(){
   }
 }
 
+/* ============================================================================
+   LE COMPTEUR D'IMAGES  —  index.html?fps
+   En VR, la fluidité passe avant la beauté : sous 72 images par seconde le
+   confort s'effondre. Ce compteur dit ce qu'on peut encore se permettre
+   d'ajouter au décor. Il affiche aussi ce que la carte graphique a à tenir :
+   nombre d'appels de dessin et de triangles par image.
+   ============================================================================ */
+const FPS_ACTIF = /[?&]fps\b/.test(location.search);
+let fpsForce = false;        /* au casque : bouton B ou Y pour l'afficher */
+let fpsN = 0, fpsT0 = 0, fpsMin = 999;
+/* Au casque, le HTML n'est plus affiché : le compteur devient une petite
+   plaque en haut à gauche du champ de vision. */
+const fpsVR = fiche(0.30, 0.105, {l1:'', l2:'', l3:'', c:'#9FD08A'}, (g,W,H,d)=>{
+  g.fillStyle='rgba(10,8,6,.80)'; rr(g,0,0,W,H,12); g.fill();
+  g.strokeStyle=d.c; g.lineWidth=3; rr(g,3,3,W-6,H-6,10); g.stroke();
+  g.textAlign='left'; g.textBaseline='top'; g.fillStyle=d.c;
+  g.font='bold 30px monospace'; g.fillText(d.l1, 14, 8);
+  g.font='22px monospace'; g.fillText(d.l2, 14, 44); g.fillText(d.l3, 14, 70);
+}, 1000);
+fpsVR.position.set(-0.30, 0.24, -0.95);
+fpsVR.renderOrder = 12; fpsVR.material.depthTest = false; fpsVR.visible = false;
+camera.add(fpsVR);
+function animFps(){
+  if (!FPS_ACTIF && !fpsForce){ if (fpsVR.visible) fpsVR.visible = false; return; }
+  const e = S('fps'); if (!e) return;
+  const now = performance.now();
+  if (!fpsT0){ fpsT0 = now; e.hidden = false; return; }
+  fpsN++;
+  if (now - fpsT0 < 500) return;
+  const f = fpsN * 1000 / (now - fpsT0);
+  fpsN = 0; fpsT0 = now;
+  if (f < fpsMin && f > 1) fpsMin = f;
+  const info = renderer.info.render;
+  const l1 = f.toFixed(0) + ' im/s   min ' + fpsMin.toFixed(0);
+  const l2 = info.calls + ' appels   ' + Math.round(info.triangles/1000) + ' k tri';
+  e.textContent = l1 + '\n' + l2 + '\n' + phase;
+  e.className = f >= 70 ? '' : (f >= 55 ? 'bas' : 'rouge');
+  fpsVR.visible = renderer.xr.isPresenting;
+  if (fpsVR.visible){
+    Object.assign(fpsVR.userData, { l1, l2, l3: phase,
+      c: f >= 70 ? '#9FD08A' : (f >= 55 ? '#F2B36A' : '#F07A5A') });
+    fpsVR.userData.redraw();
+  }
+}
+
+function calerHauteur(){
+  if (!renderer.xr.isPresenting) return;
+  const h = camera.position.y;           /* hauteur réelle des yeux, repère « local-floor » */
+  if (!(h > 0.6 && h < 2.3)) return;     /* lecture aberrante : on ne touche à rien */
+  rigY = Math.max(-0.7, Math.min(0.9, 1.50 - h));
+  rig.position.y = rigY;
+}
+renderer.xr.addEventListener('sessionstart', () => {
+  setTimeout(calerHauteur, 600); setTimeout(calerHauteur, 1800);
+  recitMontrer();
+});
+renderer.xr.addEventListener('sessionend', () => { rigY = 0; rig.position.y = 0; });
+
+/* ============================================================================
+   L'AMBIANCE — lumière, poids des objets, son, matière qui vit
+   Tout ce qui suit est du décor : aucune valeur scientifique n'en dépend.
+   Budget : chaque ajout coûte au plus un ou deux appels de dessin, et les
+   systèmes de particules s'éteignent (visible = false) quand ils sont vides.
+   ============================================================================ */
+
+/* ---- un disque blanc à bord doux, pour toutes les particules ---- */
+function spriteDoux(dur){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), r = g.createRadialGradient(32,32,0,32,32,32);
+  r.addColorStop(0, 'rgba(255,255,255,1)');
+  r.addColorStop(dur || 0.35, 'rgba(255,255,255,.55)');
+  r.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+}
+const SPRITE = spriteDoux(0.30);
+
+/* ---------------------------------------------------------------------------
+   1. LE POIDS : des ombres de contact sous chaque objet posé
+   Les ombres portées en temps réel sont floues et décollées à cette échelle ;
+   un dégradé sombre juste sous l'objet suffit à le « poser » sur le plan.
+   --------------------------------------------------------------------------- */
+const ombreTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), r = g.createRadialGradient(64,64,0,64,64,64);
+  r.addColorStop(0, 'rgba(0,0,0,1)'); r.addColorStop(0.45, 'rgba(0,0,0,.55)'); r.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = r; g.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+})();
+function ombreContact(parent, w, d, x, y, z, force){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
+    new THREE.MeshBasicMaterial({ map:ombreTex, transparent:true, opacity:force || 0.45, depthWrite:false,
+      toneMapped:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2 }));
+  m.rotation.x = -Math.PI/2; m.position.set(x, y, z); m.renderOrder = 1;
+  parent.add(m); return m;
+}
+ombreContact(gMiseEnPlace, 0.98, 0.36, 0, PY + 0.0008, ZB, 0.30);          /* la planche */
+for (const n in bocaux) ombreContact(bocaux[n], 0.21, 0.21, 0, 0.0009, 0, 0.55);
+ombreContact(balance, 0.37, 0.37, 0, 0.0008, 0, 0.50);
+ombreContact(moule,   0.38, 0.24, 0, 0.0008, 0, 0.50);
+ombreContact(four,    0.44, 0.38, 0, 0.0008, 0, 0.60);
+ombreContact(claie,   0.36, 0.28, 0, 0.0008, 0, 0.40);
+/* les deux briques bougent : leur ombre les suit et pâlit quand elles montent */
+const ombresSuivies = [briqueSeche, briqueTemoin].map(b =>
+  ({ b, o: ombreContact(gCuisson, 0.34, 0.20, 0, PY + 0.0008, 0, 0.55) }));
+function majOmbres(){
+  for (const { b, o } of ombresSuivies){
+    if (!b.visible){ o.visible = false; continue; }
+    const h = b.position.y - (PY + 0.045);
+    const k = Math.max(0, Math.min(1, 1 - h/0.12));
+    o.visible = k > 0.02;
+    o.position.set(b.position.x, PY + 0.0008, b.position.z);
+    o.scale.set(b.scale.x, b.scale.z, 1);
+    o.material.opacity = 0.55*k;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   2. LA MATIÈRE DANS LES BOCAUX
+   Une couleur unie se lisait comme du plastique. Chaque ingrédient reçoit sa
+   texture : mottes de terre, grains de sable, brins de paille, eau.
+   --------------------------------------------------------------------------- */
+function textureMatiere(nom, hex){
+  const c = document.createElement('canvas'); c.width = 128; c.height = 256;
+  const g = c.getContext('2d');
+  const R = (hex >> 16) & 255, V = (hex >> 8) & 255, B = hex & 255;
+  const teinte = (k, a) => 'rgba(' + Math.min(255, Math.round(R*k)) + ',' + Math.min(255, Math.round(V*k)) + ','
+                                   + Math.min(255, Math.round(B*k)) + ',' + (a == null ? 1 : a) + ')';
+  let s = 1 + nom.length*977; const rn = () => (s = (s*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  g.fillStyle = teinte(1); g.fillRect(0, 0, 128, 256);
+  if (nom === 'TERRE'){
+    for (let i=0;i<1100;i++){ g.fillStyle = teinte(0.72 + rn()*0.45, 0.85);
+      g.beginPath(); g.arc(rn()*128, rn()*256, 1 + rn()*3.6, 0, 7); g.fill(); }
+    for (let i=0;i<60;i++){ g.fillStyle = teinte(0.55, 0.7);
+      g.beginPath(); g.ellipse(rn()*128, rn()*256, 3 + rn()*4, 2 + rn()*3, rn()*3, 0, 7); g.fill(); }
+  } else if (nom === 'SABLE'){
+    for (let i=0;i<5200;i++){ g.fillStyle = teinte(0.62 + rn()*0.70, 1); g.fillRect(rn()*128, rn()*256, 1.3, 1.3); }
+    for (let i=0;i<260;i++){ g.fillStyle = teinte(0.45, 0.9); g.fillRect(rn()*128, rn()*256, 1.6, 1.6); }
+  } else if (nom === 'FIBRES'){
+    g.fillStyle = teinte(0.80); g.fillRect(0, 0, 128, 256);
+    g.lineCap = 'round';
+    for (let i=0;i<340;i++){
+      const x = rn()*128, y = rn()*256, a = rn()*Math.PI, l = 10 + rn()*34;
+      g.strokeStyle = teinte(0.70 + rn()*0.55, 0.95); g.lineWidth = 0.9 + rn()*1.6;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a)*l, y + Math.sin(a)*l); g.stroke();
+    }
+  } else {
+    const gr = g.createLinearGradient(0, 0, 0, 256);
+    gr.addColorStop(0, teinte(1.25)); gr.addColorStop(1, teinte(0.80));
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 256);
+    g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 1.2;
+    for (let i=0;i<14;i++){ const y = rn()*256; g.beginPath(); g.moveTo(0, y);
+      for (let x=0; x<=128; x+=8) g.lineTo(x, y + Math.sin(x*0.09 + i)*2.2); g.stroke(); }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 1); t.anisotropy = 4;
+  return t;
+}
+for (const [nom, hex] of [['TERRE',0x9A6236], ['SABLE',0xC9A970], ['FIBRES',0xD8C583], ['EAU',0x6E9AA8]]){
+  const u = bocaux[nom].userData, t = textureMatiere(nom, hex);
+  u.cont.material.map = t; u.cont.material.color.setHex(0xFFFFFF);
+  const t2 = t.clone(); t2.repeat.set(1, 0.5); t2.needsUpdate = true;
+  u.dessus.material.map = t2; u.dessus.material.color.setHex(0xF4F4F4);
+  if (nom === 'EAU'){ u.cont.material.roughness = 0.18; u.dessus.material.roughness = 0.06; }
+  u.cont.material.needsUpdate = u.dessus.material.needsUpdate = true;
+}
+
+/* ---------------------------------------------------------------------------
+   3. LA CUISINE HABITÉE : casseroles de cuivre, torchon
+   Fusionnés en un seul maillage par matière : deux appels de dessin en tout.
+   --------------------------------------------------------------------------- */
+function fusionnerBoites(liste, matBase){
+  let nV = 0, nI = 0;
+  for (const m of liste){ nV += m.geometry.attributes.position.count; nI += m.geometry.index.count; }
+  const pos = new Float32Array(nV*3), nor = new Float32Array(nV*3), uv = new Float32Array(nV*2),
+        col = new Float32Array(nV*3), idx = new (nV > 65535 ? Uint32Array : Uint16Array)(nI);
+  const v = new THREE.Vector3(), nm = new THREE.Matrix3(), centres = [], tri0 = [], comptes = [];
+  let ov = 0, oi = 0;
+  for (const m of liste){
+    m.updateMatrix(); m.updateWorldMatrix(true, false); nm.getNormalMatrix(m.matrix);
+    const G = m.geometry, P = G.attributes.position, N = G.attributes.normal, U = G.attributes.uv, I = G.index;
+    const c = m.material.color;
+    for (let i=0;i<P.count;i++){
+      const k = ov + i;
+      v.fromBufferAttribute(P, i).applyMatrix4(m.matrix); pos[k*3] = v.x; pos[k*3+1] = v.y; pos[k*3+2] = v.z;
+      v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nor[k*3] = v.x; nor[k*3+1] = v.y; nor[k*3+2] = v.z;
+      if (U){ uv[k*2] = U.getX(i); uv[k*2+1] = U.getY(i); }
+      col[k*3] = c.r; col[k*3+1] = c.g; col[k*3+2] = c.b;
+    }
+    tri0.push(oi/3); comptes.push(P.count);
+    for (let j=0;j<I.count;j++) idx[oi+j] = I.getX(j) + ov;
+    centres.push(new THREE.Vector3().setFromMatrixPosition(m.matrixWorld));
+    ov += P.count; oi += I.count;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal',   new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute('uv',       new THREE.BufferAttribute(uv, 2));
+  const aNormal = new THREE.BufferAttribute(col, 3);
+  geo.setAttribute('color', aNormal);
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  const mat = matBase.clone(); mat.vertexColors = true; mat.color.setHex(0xFFFFFF);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.fusion = { centres, tri0, comptes, aNormal,
+                           aTh: new THREE.BufferAttribute(new Float32Array(nV*3), 3), matTh: null };
+  return mesh;
+}
+{
+  const mCuivre = new THREE.MeshStandardMaterial({ color:0xB8734A, roughness:0.30, metalness:0.95 });
+  const YR = PY + 0.835, ZR = -1.022, cuivre = [], laiton = [];
+  const add = (geo, mat, x, y, z, rx, liste) => { const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z); if (rx) m.rotation.x = rx; liste.push(m); return m; };
+  /* la barre, à droite : le centre appartient à la carte et à l'ardoise */
+  const barre = add(new THREE.CylinderGeometry(0.0075, 0.0075, 0.86, 10), mLaiton, 1.10, YR, ZR + 0.020, 0, laiton);
+  barre.rotation.z = Math.PI/2;
+  for (const x of [0.70, 1.50]) add(new THREE.BoxGeometry(0.014, 0.014, 0.030), mLaiton, x, YR, ZR + 0.004, 0, laiton);
+  for (const [x, r] of [[0.84, 0.082], [1.10, 0.100], [1.36, 0.072]]){
+    const yC = YR - 0.030 - 0.140 - r;                     /* crochet, queue, puis la casserole */
+    add(new THREE.CylinderGeometry(r, r*0.93, 0.050, 30), mCuivre, x, yC, ZR + 0.030, Math.PI/2, cuivre);
+    add(new THREE.TorusGeometry(r*0.985, 0.0045, 6, 30), mCuivre, x, yC, ZR + 0.056, 0, cuivre);
+    add(new THREE.BoxGeometry(0.020, 0.150, 0.008), mCuivre, x, YR - 0.030 - 0.075, ZR + 0.012, 0, cuivre);
+    add(new THREE.TorusGeometry(0.014, 0.0028, 6, 14), mLaiton, x, YR - 0.016, ZR + 0.020, 0, laiton);
+  }
+  const fc = fusionnerBoites(cuivre, mCuivre); fc.castShadow = true; scene.add(fc);
+  const fl = fusionnerBoites(laiton, mLaiton); scene.add(fl);
+
+  /* le torchon, plié sur le plan, à droite */
+  const c = document.createElement('canvas'); c.width = 128; c.height = 96;
+  const g = c.getContext('2d');
+  g.fillStyle = '#EFE9DC'; g.fillRect(0, 0, 128, 96);
+  for (let i=0;i<900;i++){ g.fillStyle = 'rgba(120,100,70,' + (Math.random()*0.06) + ')'; g.fillRect(Math.random()*128, Math.random()*96, 1, 1); }
+  g.fillStyle = '#A7382C'; for (const y of [10, 18, 74, 82]) g.fillRect(0, y, 128, 4);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const torchon = box(0.22, 0.012, 0.15, new THREE.MeshStandardMaterial({ map:t, roughness:0.95 }),
+                      0.80, PY + 0.006, -0.620);
+  torchon.rotation.y = 0.14;
+  ombreContact(scene, 0.27, 0.20, 0.80, PY + 0.0008, -0.620, 0.30).rotation.z = 0.14;
+}
+
+/* ---------------------------------------------------------------------------
+   4. LE MUR FUSIONNÉ
+   Pendant la pose, chaque brique est un objet : il faut la voir voler.
+   Une fois le mur fermé, 126 briques deviennent UN maillage (et le mortier
+   un autre) : on passe de ~180 appels de dessin à 2 pour le mur, ce qui
+   compte double au casque (un rendu par œil).
+   La brique gravée et celle du visiteur restent à part.
+   --------------------------------------------------------------------------- */
+let murFus = null, mortierFus = null;
+function fusionnerMur(){
+  const lb = briques.filter(b => !b.userData.clef && !b.userData.grave);
+  if (!murFus){
+    murFus = fusionnerBoites(lb, mTerreBrique);
+    murFus.castShadow = murFus.receiveShadow = true; murFus.userData.th = 'mur';
+    gChantier.add(murFus);
+    mortierFus = fusionnerBoites(mortiers, mMortier);
+    mortierFus.receiveShadow = true; mortierFus.userData.th = 'mur';
+    gChantier.add(mortierFus);
+  }
+  /* toujours : les originaux restent cachés, même si on les a réaffichés */
+  for (const b of lb) b.visible = false;
+  for (const m of mortiers) m.visible = false;
+}
+/* caméra thermique : chaque brique garde SA couleur, calculée en son centre,
+   exactement comme lorsqu'elle était un objet séparé */
+function peindreFusion(o, T){
+  const F = o.userData.fusion, a = F.aTh.array;
+  let k = 0;
+  for (let i=0;i<F.centres.length;i++){
+    const c = F.centres[i], col = couleurTh(champT(c.x, c.y), T.min, T.max);
+    for (let j=0;j<F.comptes[i];j++, k++){ a[k*3] = col.r; a[k*3+1] = col.g; a[k*3+2] = col.b; }
+  }
+  F.aTh.needsUpdate = true;
+  o.geometry.setAttribute('color', F.aTh);
+  if (!F.matTh) F.matTh = new THREE.MeshBasicMaterial({ vertexColors:true, toneMapped:false });
+  o.material = F.matTh;
+}
+function restaurerFusion(){
+  for (const o of [murFus, mortierFus]) if (o) o.geometry.setAttribute('color', o.userData.fusion.aNormal);
+}
+/* le réticule lit la température de LA brique visée, pas du maillage entier */
+function centreTouche(h){
+  const F = h.object.userData.fusion, c = new THREE.Vector3();
+  if (F && h.faceIndex != null){
+    let i = 0; while (i + 1 < F.tri0.length && F.tri0[i+1] <= h.faceIndex) i++;
+    return c.copy(F.centres[i]);
+  }
+  h.object.getWorldPosition(c); return c;
+}
+
+/* ---------------------------------------------------------------------------
+   5. LES PARTICULES : vapeur, poussière de chantier, fumée
+   Un seul petit moteur, alpha par particule (couleur RGBA de sommet).
+   --------------------------------------------------------------------------- */
+function systemeParticules(N, taille, couleur, parent, alphaMax, frein, montee){
+  const pos = new Float32Array(N*3), col = new Float32Array(N*4);
+  for (let i=0;i<N;i++) pos[i*3+1] = -999;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 4).setUsage(THREE.DynamicDrawUsage));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size:taille, map:SPRITE, vertexColors:true,
+    transparent:true, depthWrite:false, toneMapped:false }));
+  pts.frustumCulled = false; pts.visible = false; pts.renderOrder = 2; parent.add(pts);
+  return { pts, pos, col, N, vies:new Float32Array(N), vie0:new Float32Array(N), vit:new Float32Array(N*3),
+           rgb:new THREE.Color(couleur), libre:0, alphaMax, frein, montee, actifs:0 };
+}
+function emettre(p, x, y, z, vx, vy, vz, vie){
+  const i = p.libre; p.libre = (p.libre + 1) % p.N;
+  p.pos[i*3] = x; p.pos[i*3+1] = y; p.pos[i*3+2] = z;
+  p.vit[i*3] = vx; p.vit[i*3+1] = vy; p.vit[i*3+2] = vz;
+  p.vies[i] = vie; p.vie0[i] = vie; p.actifs++;
+}
+function animerParticules(p, dt){
+  if (p.actifs === 0){ p.pts.visible = false; return; }
+  let n = 0;
+  for (let i=0;i<p.N;i++){
+    if (p.vies[i] <= 0){ p.col[i*4+3] = 0; continue; }
+    p.vies[i] -= dt; n++;
+    const fr = Math.max(0, 1 - p.frein*dt);
+    p.vit[i*3] *= fr; p.vit[i*3+2] *= fr; p.vit[i*3+1] += p.montee*dt;
+    p.pos[i*3] += p.vit[i*3]*dt; p.pos[i*3+1] += p.vit[i*3+1]*dt; p.pos[i*3+2] += p.vit[i*3+2]*dt;
+    const u = 1 - Math.max(0, p.vies[i])/p.vie0[i];
+    p.col[i*4] = p.rgb.r; p.col[i*4+1] = p.rgb.g; p.col[i*4+2] = p.rgb.b;
+    p.col[i*4+3] = Math.max(0, Math.min(1, u*6) * (1 - u) * p.alphaMax);
+  }
+  p.actifs = n;
+  p.pts.geometry.attributes.position.needsUpdate = true;
+  p.pts.geometry.attributes.color.needsUpdate = true;
+  p.pts.visible = n > 0;
+}
+const vapeurs   = systemeParticules(56, 0.070, 0xF4F4F2, scene,     0.45, 0.8,  0.03);
+const poussiereB= systemeParticules(140, 0.050, 0xB89A78, gChantier, 0.50, 2.6, -0.06);
+const fumee     = systemeParticules(40, 0.60,  0xD8DADE, gChantier, 0.26, 0.15, 0.04);
+const emetteurs = [];
+function emetteur(duree, periode, f){ const t = performance.now()/1000;
+  emetteurs.push({ fin: t + duree, prochain: t, periode, f }); }
+/* l'eau quitte la brique : à l'étuve, ça fume ; à l'air, à peine */
+function vapeurFour(d){
+  emetteur(d, 0.07, () => emettre(vapeurs, four.position.x + (Math.random()-0.5)*0.12, PY + 0.262,
+    four.position.z + (Math.random()-0.5)*0.10, (Math.random()-0.5)*0.03, 0.10 + Math.random()*0.06,
+    (Math.random()-0.5)*0.03, 1.8 + Math.random()*0.8));
+}
+function vapeurClaie(d){
+  emetteur(d, 0.30, () => emettre(vapeurs, POSE_CLAIE.x + (Math.random()-0.5)*0.16, POSE_CLAIE.y + 0.045,
+    POSE_CLAIE.z + (Math.random()-0.5)*0.08, 0.01, 0.05 + Math.random()*0.03, 0, 2.2));
+}
+/* le petit nuage de terre quand une brique se pose */
+function poussiereBrique(p){
+  for (let i=0;i<6;i++) emettre(poussiereB, p.x + (Math.random()-0.5)*BL*0.8, p.y - BH*0.3, p.z + BE/2 + 0.01,
+    (Math.random()-0.5)*0.30, 0.05 + Math.random()*0.18, 0.08 + Math.random()*0.14, 0.7 + Math.random()*0.4);
+}
+const CHEMINEE = new THREE.Vector3(-LONG*0.26, HAUT + RIDGE + 0.66, -1.80 - PROF/2 + 0.10);
+
+/* la poussière qui danse dans la lumière de la suspension */
+const poussiereCuisine = (() => {
+  const N = 110, pos = new Float32Array(N*3), col = new Float32Array(N*4), base = new Float32Array(N*4);
+  let s = 9091; const rn = () => (s = (s*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  for (let i=0;i<N;i++){
+    const y = PY + 0.25 + rn()*(1.82 - PY - 0.25);
+    const r = (0.10 + 0.50*(1.85 - y)/(1.85 - PY - 0.25)) * Math.sqrt(rn()), a = rn()*Math.PI*2;
+    base[i*4] = Math.cos(a)*r; base[i*4+1] = y; base[i*4+2] = -0.40 + Math.sin(a)*r; base[i*4+3] = rn()*6.283;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 4).setUsage(THREE.DynamicDrawUsage));
+  const p = new THREE.Points(geo, new THREE.PointsMaterial({ size:0.0065, map:SPRITE, vertexColors:true,
+    transparent:true, depthWrite:false, toneMapped:false }));
+  p.frustumCulled = false; p.userData = { pos, col, base, N }; scene.add(p);
+  return p;
+})();
+function majPoussiereCuisine(t){
+  const { pos, col, base, N } = poussiereCuisine.userData;
+  for (let i=0;i<N;i++){
+    const ph = base[i*4+3];
+    pos[i*3]   = base[i*4]   + 0.045*Math.sin(t*0.21 + ph);
+    pos[i*3+1] = base[i*4+1] + 0.060*Math.sin(t*0.13 + ph*1.7);
+    pos[i*3+2] = base[i*4+2] + 0.045*Math.cos(t*0.17 + ph*0.6);
+    col[i*4] = 1.0; col[i*4+1] = 0.93; col[i*4+2] = 0.80;
+    col[i*4+3] = 0.10 + 0.22*(0.5 + 0.5*Math.sin(t*0.55 + ph*3.1));
+  }
+  poussiereCuisine.geometry.attributes.position.needsUpdate = true;
+  poussiereCuisine.geometry.attributes.color.needsUpdate = true;
+}
+
+/* la neige de l'hiver : jamais sur le visage du visiteur, jamais dans la maison */
+const neige = (() => {
+  const N = 800, pos = new Float32Array(N*3);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  const p = new THREE.Points(geo, new THREE.PointsMaterial({ size:0.030, map:SPRITE, color:0xFFFFFF,
+    transparent:true, opacity:0.9, depthWrite:false }));
+  p.frustumCulled = false; p.visible = false; p.userData = { pos, N }; gChantier.add(p);
+  return p;
+})();
+function placerFlocon(i, partout){
+  const pos = neige.userData.pos;
+  for (let e = 0; e < 10; e++){
+    const x = (Math.random() - 0.5)*12, z = -7 + Math.random()*11.5, y = partout ? Math.random()*6.5 : 6.5;
+    if (Math.hypot(x, z - 2.5) < 1.05) continue;
+    if (Math.abs(x) < 1.6 && z < -1.45 && z > -6.4) continue;
+    pos[i*3] = x; pos[i*3+1] = y; pos[i*3+2] = z; return;
+  }
+  pos[i*3+1] = -5;
+}
+for (let i=0;i<neige.userData.N;i++) placerFlocon(i, true);
+function majNeige(dt, t){
+  const { pos, N } = neige.userData;
+  for (let i=0;i<N;i++){
+    pos[i*3+1] -= (0.45 + 0.25*((i*37) % 10)/10)*dt;
+    pos[i*3]   += Math.sin(t*0.8 + i)*0.10*dt;
+    if (pos[i*3+1] < 0.02) placerFlocon(i, false);
+  }
+  neige.geometry.attributes.position.needsUpdate = true;
+}
+
+/* le givre sur les vitres, en hiver */
+const VITRAGE0 = { c: mVitrage.color.getHex(), r: mVitrage.roughness, o: mVitrage.opacity, cc: mVitrage.clearcoat };
+function givrer(on){
+  if (on){ mVitrage.color.setHex(0xEEF4F8); mVitrage.roughness = 0.45; mVitrage.opacity = 0.60; mVitrage.clearcoat = 0.25; }
+  else { mVitrage.color.setHex(VITRAGE0.c); mVitrage.roughness = VITRAGE0.r; mVitrage.opacity = VITRAGE0.o; mVitrage.clearcoat = VITRAGE0.cc; }
+}
+
+/* un oiseau traverse le ciel pendant que le mur monte */
+const oiseau = new THREE.Group(); oiseau.visible = false; gChantier.add(oiseau);
+const ailes = [];
+{
+  const m = new THREE.MeshBasicMaterial({ color:0x2E2925, side:THREE.DoubleSide });
+  const corps = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), m); corps.scale.set(2.4, 0.8, 0.8); oiseau.add(corps);
+  for (const c of [-1, 1]){
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.07,0,0, 0.07,0,0, -0.03,0,c*0.30]), 3));
+    geo.computeVertexNormals();
+    const a = new THREE.Mesh(geo, m); oiseau.add(a); ailes.push([a, c]);
+  }
+  oiseau.scale.setScalar(1.5);
+}
+let oiseauT0 = -1;
+const OIS_A = new THREE.Vector3(-10, 3.2, -6.5), OIS_B = new THREE.Vector3(10, 3.9, -3.5);   /* dans le champ de vision, au-dessus du mur */
+function oiseauPasse(){ if (phase !== 'mur') return; oiseauT0 = performance.now(); oiseau.visible = true; oiseau.userData.chant = false; }
+function majOiseau(t){
+  if (oiseauT0 < 0) return;
+  const u = (performance.now() - oiseauT0)/7000;
+  if (u >= 1 || phase !== 'mur'){ oiseau.visible = false; oiseauT0 = -1; return; }
+  oiseau.position.lerpVectors(OIS_A, OIS_B, u); oiseau.position.y += Math.sin(u*Math.PI*3)*0.25;
+  oiseau.rotation.y = -Math.atan2(OIS_B.z - OIS_A.z, OIS_B.x - OIS_A.x);
+  const bat = (u % 0.33) < 0.22;                       /* des battements, puis un plané */
+  for (const [a, c] of ailes) a.rotation.x = bat ? c*Math.sin(t*16)*0.75 : -c*0.12;
+  if (!oiseau.userData.chant && u > 0.35){ oiseau.userData.chant = true;
+    if (AC) chantOiseau(oiseau.getWorldPosition(new THREE.Vector3()), 1.3); }
+}
+
+/* ---------------------------------------------------------------------------
+   6. LE SON DANS L'ESPACE
+   Chaque bruit est placé là où il naît (HRTF : on l'entend à gauche, à
+   droite, devant). Une ambiance par lieu, en fondu enchaîné de 2,5 s.
+   --------------------------------------------------------------------------- */
+let pannersHRTF = 0;    /* le HRTF coûte du calcul : au-delà de six sons simultanés, panoramique simple */
+function sortieAudio(pos, duree){
+  if (!pos || !AC.createPanner) return busSortie;
+  const p = AC.createPanner();
+  const hrtf = !duree || pannersHRTF < 6;
+  p.panningModel = hrtf ? 'HRTF' : 'equalpower';
+  p.distanceModel = 'inverse'; p.refDistance = 0.8; p.rolloffFactor = 0.9; p.maxDistance = 80;
+  if (p.positionX){ p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z; }
+  else p.setPosition(pos.x, pos.y, pos.z);
+  p.connect(busSortie);
+  if (duree){ if (hrtf) pannersHRTF++;
+    setTimeout(() => { try{ p.disconnect(); }catch(e){} if (hrtf) pannersHRTF--; }, (duree + 0.5)*1000); }
+  return p;
+}
+const _ep = new THREE.Vector3(), _ef = new THREE.Vector3(), _eu = new THREE.Vector3();
+function majEcoute(){
+  const M = camera.matrixWorld;
+  _ep.setFromMatrixPosition(M);
+  _ef.set(0, 0, -1).transformDirection(M); _eu.set(0, 1, 0).transformDirection(M);
+  const L = AC.listener;
+  if (L.positionX){
+    L.positionX.value = _ep.x; L.positionY.value = _ep.y; L.positionZ.value = _ep.z;
+    L.forwardX.value = _ef.x; L.forwardY.value = _ef.y; L.forwardZ.value = _ef.z;
+    L.upX.value = _eu.x; L.upY.value = _eu.y; L.upZ.value = _eu.z;
+  } else { L.setPosition(_ep.x, _ep.y, _ep.z); L.setOrientation(_ef.x, _ef.y, _ef.z, _eu.x, _eu.y, _eu.z); }
+}
+function chantOiseau(pos, vol){
+  if (!AC) return;
+  const t0 = AC.currentTime + 0.02, n = 2 + Math.floor(Math.random()*4), base = 2600 + Math.random()*1800;
+  const out = sortieAudio(pos, n*0.17 + 0.3);
+  for (let i=0;i<n;i++){
+    const o = AC.createOscillator(), g = AC.createGain(), t = t0 + i*(0.10 + Math.random()*0.06);
+    const f0 = base*(0.9 + Math.random()*0.25), f1 = f0*(Math.random() < 0.5 ? 1.35 : 0.72);
+    o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 0.07);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05*vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.085);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.1);
+  }
+}
+/* la sonnerie de minuterie quand l'étuve a fini */
+function sonMinuteur(pos){
+  if (!AC){ audioDemarre(); if (!AC) return; }
+  const out = sortieAudio(pos, 2.2);
+  for (const dt of [0, 0.34]){
+    const t = AC.currentTime + dt;
+    for (const [mult, a] of [[1, 0.10], [2.76, 0.035], [5.40, 0.014]]){
+      const o = AC.createOscillator(), g = AC.createGain(); o.type = 'sine'; o.frequency.value = 1760*mult;
+      g.gain.setValueAtTime(a, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + 1.25);
+    }
+  }
+}
+/* un choc mat : du bruit filtré bas et une note grave qui tombe */
+function sonImpact(pos, f){
+  if (!AC) return;
+  const out = sortieAudio(pos, 0.4), t = AC.currentTime;
+  const s = source(), fi = AC.createBiquadFilter(), g = AC.createGain();
+  fi.type = 'lowpass'; fi.frequency.value = f || 700; s.connect(fi); fi.connect(g); g.connect(out);
+  g.gain.setValueAtTime(0.20, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+  s.start(t, Math.random()*1.5); s.stop(t + 0.09);
+  const o = AC.createOscillator(), g2 = AC.createGain();
+  o.frequency.setValueAtTime(115, t); o.frequency.exponentialRampToValueAtTime(58, t + 0.10);
+  g2.gain.setValueAtTime(0.16, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  o.connect(g2); g2.connect(out); o.start(t); o.stop(t + 0.13);
+}
+/* la craie sur l'ardoise */
+function sonCraie(pos, d){
+  if (!AC) return;
+  const out = sortieAudio(pos, d + 0.2), t = AC.currentTime;
+  const s = source(), fi = AC.createBiquadFilter(), g = AC.createGain();
+  fi.type = 'bandpass'; fi.frequency.value = 3200; fi.Q.value = 1.6;
+  s.connect(fi); fi.connect(g); g.connect(out);
+  g.gain.setValueAtTime(0.0001, t);
+  for (let x = 0; x < d; x += 0.11){
+    g.gain.setValueAtTime(0.0001, t + x); g.gain.linearRampToValueAtTime(0.05 + Math.random()*0.03, t + x + 0.03);
+    g.gain.linearRampToValueAtTime(0.0001, t + x + 0.09);
+  }
+  s.start(t, Math.random()*1.5); s.stop(t + d + 0.05);
+}
+/* la cloche qu'on soulève : un tintement métallique */
+function sonCloche(pos){
+  if (!AC) return;
+  const out = sortieAudio(pos, 1.4), t = AC.currentTime;
+  for (const [f, a] of [[2093, 0.06], [3390, 0.035], [5210, 0.016]]){
+    const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = f;
+    g.gain.setValueAtTime(a, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + 1.15);
+  }
+}
+
+const AMB = { cle:null, courant:null, oiseauT:0 };
+function bruitFiltre(type, f, q, gain, sortie, arret){
+  const s = source(), fi = AC.createBiquadFilter(), g = AC.createGain();
+  fi.type = type; fi.frequency.value = f; fi.Q.value = q; g.gain.value = gain;
+  s.connect(fi); fi.connect(g); g.connect(sortie); s.start(0, Math.random()*1.8); arret.push(s);
+  return { fi, g };
+}
+function lfo(freq, amp, param, arret, forme){
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = forme || 'sine'; o.frequency.value = freq; g.gain.value = amp;
+  o.connect(g); g.connect(param); o.start(); arret.push(o);
+}
+function construireAmbiance(cle){
+  const sortie = AC.createGain(); sortie.gain.value = 0; sortie.connect(busSortie);
+  const arret = []; let niveau = 1;
+  if (cle === 'cuisine'){
+    /* le ronron d'un frigo, une pièce calme */
+    for (const [f, a] of [[98, 0.010], [196, 0.0035]]){
+      const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = f; g.gain.value = a;
+      o.connect(g); g.connect(sortie); o.start(); arret.push(o);
+    }
+    bruitFiltre('lowpass', 240, 0.5, 0.030, sortie, arret);
+  } else if (cle === 'chantier'){
+    /* le vent dans la campagne */
+    const v = bruitFiltre('lowpass', 430, 0.6, 0.060, sortie, arret);
+    lfo(0.11, 0.030, v.g.gain, arret);
+    const v2 = bruitFiltre('bandpass', 900, 0.8, 0.014, sortie, arret);
+    lfo(0.07, 0.010, v2.g.gain, arret);
+  } else if (cle === 'ete'){
+    /* les cigales, dehors, et la pièce fraîche */
+    const c = bruitFiltre('bandpass', 5200, 4, 0.0, sortie, arret);
+    const am = AC.createGain(); am.gain.value = 0.5;
+    c.g.disconnect(); c.g.gain.value = 0.045; c.g.connect(am); am.connect(sortie);
+    lfo(42, 0.5, am.gain, arret, 'sawtooth');
+    lfo(0.16, 0.022, c.g.gain, arret);
+    bruitFiltre('lowpass', 200, 0.5, 0.018, sortie, arret);
+  } else {
+    /* le vent d'hiver, plus froid, qui siffle un peu */
+    const v = bruitFiltre('bandpass', 650, 0.9, 0.080, sortie, arret);
+    lfo(0.06, 260, v.fi.frequency, arret);
+    lfo(0.13, 0.045, v.g.gain, arret);
+    bruitFiltre('highpass', 2600, 0.7, 0.007, sortie, arret);
+    if (cle === 'nuit') niveau = 0.6;
+  }
+  return { sortie, arret, niveau };
+}
+function ambianceSon(cle){
+  if (AMB.cle === cle) return;
+  AMB.cle = cle; const t = AC.currentTime;
+  const ancien = AMB.courant;
+  if (ancien){
+    ancien.sortie.gain.cancelScheduledValues(t);
+    ancien.sortie.gain.setValueAtTime(ancien.sortie.gain.value, t);
+    ancien.sortie.gain.linearRampToValueAtTime(0, t + 2.5);
+    setTimeout(() => { for (const n of ancien.arret) try{ n.stop(); }catch(e){}
+                       try{ ancien.sortie.disconnect(); }catch(e){} }, 2900);
+  }
+  const n = construireAmbiance(cle); AMB.courant = n;
+  n.sortie.gain.setValueAtTime(0, t); n.sortie.gain.linearRampToValueAtTime(n.niveau, t + 2.5);
+}
+function cleAmbiance(){
+  if (phase === 'mur') return 'chantier';
+  if (phase === 'dedans') return 'ete';
+  if (phase === 'hiver') return 'hiver';
+  if (phase === 'nuit') return 'nuit';
+  return 'cuisine';
+}
+function majAmbiance(){
+  if (!AC || !busSortie || AC.state !== 'running') return;
+  majEcoute();
+  ambianceSon(cleAmbiance());
+  const now = performance.now()/1000;
+  if (now < AMB.oiseauT) return;
+  const c = AMB.cle;
+  if (c === 'cuisine'){        /* dehors, derrière la fenêtre de droite */
+    chantOiseau(new THREE.Vector3(3.8 + Math.random()*2, 1.8 + Math.random(), -1.2 + Math.random()*1.6), 0.45);
+    AMB.oiseauT = now + 8 + Math.random()*10;
+  } else if (c === 'chantier'){
+    const a = Math.random()*Math.PI*2;
+    chantOiseau(new THREE.Vector3(Math.cos(a)*9, 4 + Math.random()*3, ZC + Math.sin(a)*9), 1);
+    AMB.oiseauT = now + 3 + Math.random()*5;
+  } else if (c === 'ete'){     /* dehors, derrière le mur de briques */
+    chantOiseau(new THREE.Vector3((Math.random() - 0.5)*3, 2.2, ZC + 2.0), 0.35);
+    AMB.oiseauT = now + 10 + Math.random()*8;
+  } else AMB.oiseauT = now + 5;
+}
+
+/* ---------------------------------------------------------------------------
+   7. LE THÉÂTRE : la lampe qui s'allume et le titre, l'ardoise qui s'écrit,
+   la cloche qu'on soulève à la fin
+   --------------------------------------------------------------------------- */
+const titreOuverture = fiche(1.00, 0.26, {}, (g, W, H) => {
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.shadowColor = 'rgba(0,0,0,.90)'; g.shadowBlur = 22;
+  const ajuste = (txt, style, taille) => {          /* le texte tient toujours dans la plaque */
+    let fs = Math.round(taille); g.font = style + ' ' + fs + 'px Georgia, serif';
+    while (g.measureText(txt).width > W*0.90 && fs > 10){ fs -= 2; g.font = style + ' ' + fs + 'px Georgia, serif'; }
+  };
+  g.fillStyle = '#FFF3DE'; ajuste('La cuisine des matériaux', 'bold', H*0.30);
+  g.fillText('La cuisine des matériaux', W/2, H*0.40);
+  g.fillStyle = '#F2C890'; ajuste('Saveurs savantes · Fête de la science', 'italic', H*0.15);
+  g.fillText('Saveurs savantes · Fête de la science', W/2, H*0.76);
+}, 900);
+titreOuverture.material.depthTest = false; titreOuverture.renderOrder = 11;
+titreOuverture.material.opacity = 0; titreOuverture.visible = false; scene.add(titreOuverture);
+let ouvertureJouee = 0;
+function ouvertureScene(){
+  if (phase !== 'ecran') return;
+  const n = ++ouvertureJouee;
+  const amp = scene.userData.ampoule;
+  const seq = [0.0, 0.25, 0.05, 0.75, 0.20, 0.55, 1.0];
+  tache(1.4, u => {
+    const k = seq[Math.min(seq.length - 1, Math.floor(u*seq.length))];
+    suspension.intensity = SUSP_I*k;
+    if (amp) amp.material.color.setHex(0xFFE2B0).multiplyScalar(0.15 + 0.85*k);
+  }, () => { suspension.intensity = SUSP_I; if (amp) amp.material.color.setHex(0xFFE2B0); });
+  camera.updateMatrixWorld();
+  const p = new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld);
+  const f = new THREE.Vector3(0, 0, -1).transformDirection(camera.matrixWorld); f.y = 0;
+  if (f.lengthSq() < 1e-4) f.set(0, 0, -1); f.normalize();
+  titreOuverture.position.copy(p).addScaledVector(f, 1.30); titreOuverture.position.y = p.y + 0.10;   /* au-dessus de l'écran d'accueil */
+  titreOuverture.lookAt(p.x, titreOuverture.position.y, p.z);
+  titreOuverture.visible = true;
+  apres(0.9, () => { if (n === ouvertureJouee) tache(0.9, u => { titreOuverture.material.opacity = lisse(u); }); });
+  apres(5.6, () => { if (n === ouvertureJouee) tache(1.3, u => { titreOuverture.material.opacity = 1 - lisse(u); },
+                                                     () => { if (n === ouvertureJouee) titreOuverture.visible = false; }); });
+}
+/* à l'écran : quand on entre en cuisine ; au casque : à l'entrée en VR */
+{ const b = S('go'); if (b) b.addEventListener('click', () => setTimeout(ouvertureScene, 150)); }
+renderer.xr.addEventListener('sessionstart', () => {
+  setTimeout(ouvertureScene, 900);
+  const s = renderer.xr.getSession();
+  if (s){ s.addEventListener('selectstart', audioDemarre); s.addEventListener('squeezestart', audioDemarre); }
+});
+document.addEventListener('pointerdown', audioDemarre, { capture:true });
+
+function ecrireArdoise(){
+  ardoiseEtat.prog = 0; peindreArdoise();
+  let dernier = 0;
+  audioDemarre(); sonCraie(ardoise.position, 3.4);
+  tache(3.6, u => { if (u - dernier > 0.05){ dernier = u; ardoiseEtat.prog = u; peindreArdoise(); } },
+        () => { ardoiseEtat.prog = 1; peindreArdoise(); });
+}
+function cocherArdoise(k){
+  if (ardoiseEtat.faits.has(k)) return;
+  ardoiseEtat.faits.add(k); ardoiseEtat.prog = 1; peindreArdoise();
+  if (!gChantier.visible && AC) sonCraie(ardoise.position, 0.3);
+}
+
+const cloche = new THREE.Group(); cloche.visible = false; scene.add(cloche);
+/* Cloche OVALE, comme pour un plat long : 38 × 25 cm, 20 cm de haut. La
+   brique (24 × 12 × 8 cm) y tient avec 10 % de marge aux arêtes, et la
+   cloche reste à 1 cm du témoin et de la planche des bocaux. */
+const CL_A = 0.19, CL_H = 0.20, CL_C = 0.125;
+{
+  const mC = mInox.clone(); mC.side = THREE.DoubleSide;
+  const d = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 14, 0, Math.PI*2, 0, Math.PI/2), mC);
+  d.scale.set(CL_A, CL_H, CL_C); d.castShadow = true; cloche.add(d);
+  const bouton = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 8), mLaiton);
+  bouton.position.y = CL_H + 0.012; cloche.add(bouton);
+  const gr = new THREE.Group(); gr.scale.set(CL_A, CL_A, CL_C); gr.position.y = 0.003; cloche.add(gr);
+  const rebord = new THREE.Mesh(new THREE.TorusGeometry(1, 0.025, 6, 48), mC);
+  rebord.rotation.x = Math.PI/2; gr.add(rebord);
+}
+function poserCloche(p){
+  cloche.position.set(p.x, PY, p.z); cloche.rotation.set(0, 0, 0); cloche.scale.setScalar(1);
+  cloche.visible = true;
+}
+function leverCloche(){
+  if (!cloche.visible){ cocherArdoise('dessert'); return; }
+  apres(1.0, () => {
+    audioDemarre(); sonCloche(cloche.position);
+    const y0 = cloche.position.y;
+    tache(1.5, u => { const k = lisse(u); cloche.position.y = y0 + 0.40*k; cloche.rotation.x = -0.55*k; }, () => {
+      if (choixFait) etiqRG.visible = etiqRD.visible = true;
+      cocherArdoise('dessert');
+      tache(0.6, u => { cloche.scale.setScalar(Math.max(0.001, 1 - lisse(u))); cloche.position.y = y0 + 0.40 + 0.15*u; },
+            () => { cloche.visible = false; cloche.scale.setScalar(1); });
+    });
+  });
+}
+
+/* ---------------------------------------------------------------------------
+   8. LE COMPTEUR D'IMAGES AU CASQUE : bouton B ou Y pour l'afficher
+   --------------------------------------------------------------------------- */
+let fpsBoutonAvant = false;
+function boutonsManettes(){
+  const s = renderer.xr.getSession && renderer.xr.getSession();
+  if (!s) return;
+  let appui = false;
+  for (const src of s.inputSources){
+    const gp = src.gamepad;
+    if (gp && gp.buttons[5] && gp.buttons[5].pressed) appui = true;
+  }
+  if (appui && !fpsBoutonAvant){ fpsForce = !fpsForce; sonCourt(fpsForce ? 880 : 440, 0.06, 'sine'); }
+  fpsBoutonAvant = appui;
+}
+
+/* ---------------------------------------------------------------------------
+   À CHAQUE IMAGE
+   --------------------------------------------------------------------------- */
+let tEffets = 0;
+function majEffets(){
+  /* temps réel, pas le pas de la boucle : un appareil lent ne fige pas la vapeur */
+  const t = performance.now()/1000, dt = tEffets ? Math.min(0.1, t - tEffets) : 0.016; tEffets = t;
+  const cuisine = !gChantier.visible;
+  majOmbres();
+  poussiereCuisine.visible = cuisine;
+  if (cuisine) majPoussiereCuisine(t);
+  for (let i = emetteurs.length - 1; i >= 0; i--){
+    const e = emetteurs[i];
+    while (e.prochain <= t && e.prochain < e.fin){ e.f(); e.prochain += e.periode; }
+    if (t >= e.fin) emetteurs.splice(i, 1);
+  }
+  /* l'hiver : neige et fumée de cheminée, éteintes en caméra thermique */
+  const hiver = gChantier.visible && (phase === 'hiver' || phase === 'nuit') && !enThermique;
+  neige.visible = hiver;
+  if (hiver){
+    majNeige(dt, t);
+    if (!fumee.dernier || t - fumee.dernier > 0.32){
+      fumee.dernier = t;
+      emettre(fumee, CHEMINEE.x + (Math.random() - 0.5)*0.12, CHEMINEE.y, CHEMINEE.z + (Math.random() - 0.5)*0.12,
+              0.10 + Math.random()*0.06, 0.28 + Math.random()*0.10, (Math.random() - 0.5)*0.05, 6.5);
+    }
+  }
+  animerParticules(vapeurs, dt);
+  animerParticules(poussiereB, dt);
+  animerParticules(fumee, dt);
+  if (enThermique) fumee.pts.visible = false;
+  majOiseau(t);
+  majAmbiance();
+  boutonsManettes();
+}
+if (window.FDS) window.FDS._finir = () => { phase = 'nuit'; finir(); };
+if (window.FDS) window.FDS._fx = k => ({ vapeur: () => vapeurFour(3.4),
+  oiseau: () => { oiseauT0 = performance.now() - 2600; oiseau.visible = true; },
+  poussiere: () => { for (let i=0;i<4;i++) poussiereBrique(new THREE.Vector3(-0.6 + i*0.4, 1.0, -1.8)); },
+  cloche: () => { gCuisson.visible = true; four.visible = claie.visible = false;
+    briqueSeche.visible = briqueTemoin.visible = true; briqueSeche.scale.setScalar(0.98); briqueTemoin.scale.setScalar(0.95);
+    briqueSeche.position.copy(FIN_G); briqueTemoin.position.copy(FIN_D); poserCloche(FIN_G); } })[k]();
+if (window.FDS) window.FDS._effets = () => ({
+  murFus: !!murFus, mortierFus: !!mortierFus,
+  murVisible: !!(murFus && murFus.visible), briquesVisibles: briques.filter(b => b.visible).length,
+  neige: neige.visible, fumee: fumee.actifs, vapeur: vapeurs.actifs, poussiere: poussiereB.actifs,
+  oiseau: oiseau.visible, cloche: cloche.visible, ardoise: { prog: ardoiseEtat.prog, faits: [...ardoiseEtat.faits] },
+  amb: AMB.cle, audio: AC ? AC.state : null, titre: +titreOuverture.material.opacity.toFixed(2),
+  suspension: +suspension.intensity.toFixed(2)
+});
+
 const horloge=new THREE.Clock();
 renderer.setAnimationLoop(()=>{
   const dt=Math.min(horloge.getDelta(),0.05);
-  if(actif){ t0+=dt; majActe(t0); }
+  if(actif) majActe();
   animVersement(dt);
   animPlan(dt);
   animMatiere(dt);
   animChantier();
   animVitrine();
+  animFps();
   animAir();
   animMain();
   animTaches();
@@ -4131,14 +5172,15 @@ renderer.setAnimationLoop(()=>{
   remuerManettes(dt);
   if (remueTemps>0){ remueTemps-=dt; sonRemuer(true); } else sonRemuer(false);
   const plat = !renderer.xr.isPresenting;
-  consigne.visible = !plat;            /* à l'écran, c'est le bandeau HTML qui parle */
   gHiver.visible = hiverActif && !plat;
-  /* la carte de texte s'efface dès qu'on agit : elle explique, puis elle s'écarte */
-  if (consigne.visible){
-    const occupe = !!geste || !!mainsGeste[0] || !!mainsGeste[1];
-    const vise = occupe ? 0.12 : 1.0;
-    consigne.material.opacity += (vise - consigne.material.opacity) * Math.min(1, dt*6);
-  }
+  animRecit();
+  majEffets();
+  /* À l'intérieur, la maison est construite face au mur de briques, qui est
+     DERRIÈRE le point de départ du casque : on fait tourner le visiteur d'un
+     demi-tour (pendant le fondu au noir), comme le fait déjà la vue à l'écran. */
+  { const rot = (renderer.xr.isPresenting && gDedans.visible) ? Math.PI : 0;
+    if (rig.rotation.y !== rot) rig.rotation.y = rot; }
+  majRayonsVR();
   if(!renderer.xr.isPresenting){
     if(!drag && (Math.abs(vYaw)>1e-5 || Math.abs(vPitch)>1e-5)){
       yaw += vYaw; pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, pitch + vPitch));
@@ -4152,7 +5194,7 @@ function cadrer(){
   camera.aspect=innerWidth/innerHeight;
   const portrait = innerHeight > innerWidth;
   camera.fov = portrait ? 68 : 58;
-  if (!renderer.xr.isPresenting) rig.position.set(0, 0, portrait ? 0.34 : 0.50);
+  if (!renderer.xr.isPresenting) rig.position.set(0, rigY, portrait ? 0.34 : 0.50);
   if (!cadrer.fait) { pitch = portrait ? PITCH_CUISINE : -0.30; cadrer.fait = true; }
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
